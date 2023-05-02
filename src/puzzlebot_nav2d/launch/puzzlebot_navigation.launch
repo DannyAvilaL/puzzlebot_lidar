@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="map_file" default="$(find puzzlebot_nav2d)/maps/rover-bot-map-map.yaml" />
+  <arg name="scan" default="/laser/scan" />
+  <!--<arg name="base_frame" default="odom_true" /> -->
+  <arg name="odom_frame" default="odom" />
+  <arg name="base_frame" default="base_link" />
+  <arg name="robot_init_x" default="-4"/>
+  <arg name="robot_init_y" default="-4"/>
+  <arg name="robot_init_phi" default="1.57"/>
+  <!-- The true initial position is x=-4, y=-4, phi = 0, because the robot is launched
+       heading in the x-direction of the gazebo world, whose coordinate system
+       coincides with the map. See puzzlebot_gazebo/launch/puzzlebot_room.launch -->
+
+  <!-- The odometry node is needed for the navigation using the amcl package to work -->
+  <!--
+  <node name="odometry_true" pkg="odometry" type="reference_odometry.py"/> -->
+  <node name="odometry" pkg="odometry" type="odometry.py"/>
+
+
+  <!-- Without the map, no localization possible (unless we are doing
+       Simultaneous Localizatioto And Mapping (SLAM)) -->
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)"/>
+
+  <!-- Launching amcl to localize the robot within the map using lidar data.
+       The amcl node will establish the transform between odom and map -->
+  <node name="amcl" pkg="amcl" type="amcl" output="screen">
+    <remap from="scan" to="$(arg scan)"/>
+    <param name="odom_frame_id" value="$(arg odom_frame)"/>
+    <param name="base_frame_id" value="$(arg base_frame)"/>
+    <param name="use_map_topic" value="true"/>
+    <param name="initial_pose_x" value="$(arg robot_init_x)"/>
+    <param name="initial_pose_y" value="$(arg robot_init_y)"/>
+    <param name="initial_pose_a" value="$(arg robot_init_phi)"/>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find puzzlebot_nav2d)/config/map_and_laserscan.rviz"/>
+
+  <!-- Calling the service /global_localization causes amcl to initialize with particles
+       distributed uniformly in the free space, instead of initializing with a Gaussian
+       distribution.
+
+    <node name="global_loc" pkg="rosservice" type="rosservice" args="call /global_localization"/>
+  -->
+
+</launch>

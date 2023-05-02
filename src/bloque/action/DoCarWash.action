@@ -1,0 +1,5 @@
+int32 number_of_cars
+---
+int32 total_cars_cleaned
+---
+float32 percent_cars_complete

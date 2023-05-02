@@ -1,0 +1,43 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="stop_sign">
+    <static>true</static>
+    <link name="stop_sign_link">
+      <visual name="stop_sign_visual">
+       <cast_shadows>false</cast_shadows>
+        <geometry>
+	        <plane>
+            <normal>0 0 1</normal>
+            <size>0.5 0.5</size>
+          </plane>
+        </geometry>        
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/stop_sign.material</uri>
+            <name>stop_sign</name>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 0</specular>
+          <emissive>0 1 0 1</emissive> 
+        </material>
+      </visual>
+      <collision name="stop_sign_collision">
+          <geometry>
+	        <plane>
+            <normal>0 0 1</normal>
+            <size>4 4</size>
+          </plane>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+  </model>
+</sdf>

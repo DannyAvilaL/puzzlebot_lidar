@@ -1,0 +1,43 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="track">
+    <static>true</static>
+    <link name="objective_track_link">
+      <visual name="objective_track_visual">
+       <cast_shadows>false</cast_shadows>
+        <geometry>
+	        <plane>
+            <normal>0 0 1</normal>
+            <size>4 4</size>
+          </plane>
+        </geometry>        
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/objective_track.material</uri>
+            <name>objective_track</name>
+          </script>
+         <!-- <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 0</specular>
+          <emissive>0 1 0 1</emissive> -->
+        </material>
+      </visual>
+      <collision name="objective_track_collision">
+          <geometry>
+	        <plane>
+            <normal>0 0 1</normal>
+            <size>4 4</size>
+          </plane>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+  </model>
+</sdf>

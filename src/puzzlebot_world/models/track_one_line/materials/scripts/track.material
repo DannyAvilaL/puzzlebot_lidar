@@ -1,0 +1,13 @@
+material track_one_line
+{
+  technique
+  {
+    pass
+    {  
+      texture_unit
+      {
+        texture track_one_line.png
+      }
+    }
+  }
+}

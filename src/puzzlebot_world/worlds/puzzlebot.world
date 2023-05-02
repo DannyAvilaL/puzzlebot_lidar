@@ -1,0 +1,67 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <!-- We use a custom world for the robot so that the camera angle is launched correctly -->
+
+  <world name="default">
+
+    <physics type='ode'>
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>100</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>70</iters>
+        </solver>
+      </ode>
+      <gravity>0 0 -9.8</gravity>
+    </physics>
+
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Global light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- A post box plane -->
+    <include>
+      <uri>model://bookshelf</uri>
+      <pose>4 0 0 0 0 -1.5707</pose>
+    </include>  
+
+
+    <!-- Camera gui
+    <gui fullscreen='0'>
+    
+    This start view of the gazebo gui from an specific point, and how it follows the robot
+    <gui>
+      <camera name='user_camera'>
+        <pose>4.927360 -4.376610 3.740080 0.000000 0.275643 2.356190</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+
+    or 
+
+
+    <gui fullscreen='0'>
+     <camera name="user_camera">
+        <track_visual>
+          <name>target_model</name>
+          <static>true</static>
+          <use_model_frame>true</use_model_frame>
+          <xyz>-3 0 0</xyz>
+          <inherit_yaw>true</inherit_yaw>
+        </track_visual>
+    </camera>
+</gui>--> 
+
+  </world>
+</sdf>

@@ -1,0 +1,13 @@
+material objective_track
+{
+  technique
+  {
+    pass
+    {  
+      texture_unit
+      {
+        texture objective_track.png
+      }
+    }
+  }
+}

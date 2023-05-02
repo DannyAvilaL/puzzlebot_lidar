@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <rosparam command="load" file="$(find puzzlebot_nav2d)/config/params.yaml" />
+  <node name="rhl" pkg="puzzlebot_nav2d" type="right_hand_rule.py"/>
+</launch>

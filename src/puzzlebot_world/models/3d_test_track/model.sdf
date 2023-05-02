@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="3d_test_track">
+    <static>true</static>
+    <link name="3d_test_track_link">
+      <visual name="3d_test_track_visual">
+       <cast_shadows>false</cast_shadows>
+        <geometry>
+	       <mesh>
+            <uri>model://3d_test_track/meshes/Straight_Line_1.stl</uri>
+         </mesh>
+        </geometry>        
+      </visual>
+      <collision name="3d_test_track_collision">
+          <geometry>
+	        <plane>
+            <normal>0 0 1</normal>
+            <size>1 1</size>
+          </plane>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+  </model>
+</sdf>

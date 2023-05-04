@@ -251,7 +251,7 @@
 	<joint name="lidar_to_base" type="fixed">
         <parent link="chassis"/>
         <child link="lidar"/>
-        <origin xyz="0.05 0 0.115" rpy="0 0 ${PI}"/>
+        <origin xyz="0.05 0 0.115" rpy="0 0 0"/>
     </joint>
 
 	<!-- TRANSMISSIONS (For a more complex model and it represents actuator attributes) -->

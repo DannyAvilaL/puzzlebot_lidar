@@ -70,6 +70,10 @@ def follow_right_hand_wall():
 def main():
 	while not rospy.is_shutdown():
 		if scan is not None:
+
+			# bandera para go to wall / ir hacia adelante
+
+			# bandera para right hand
 			pass
 
 if __name__ == '__main__':

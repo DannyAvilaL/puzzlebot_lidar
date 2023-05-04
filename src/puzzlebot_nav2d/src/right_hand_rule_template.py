@@ -18,7 +18,7 @@ class RightHandRuleController:
         v_max  : float
            Max linear velocity
         """
-        self.scan_listener = rospy.Subscriber('/laser/scan', LaserScan,
+        self.scan_listener = rospy.Subscriber('/scan', LaserScan,
                                               self.scan_callback)
         self.vel_pub = rospy.Publisher('/cmd_vel' , Twist, queue_size=1 )
         self.rate = rospy.Rate(10.0)

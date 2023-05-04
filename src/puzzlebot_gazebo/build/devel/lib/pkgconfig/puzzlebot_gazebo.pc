@@ -1,0 +1,8 @@
+prefix=/home/liangyichen/catkin_ws/src/puzzlebot/puzzlebot_gazebo/build/devel
+
+Name: puzzlebot_gazebo
+Description: Description of puzzlebot_gazebo
+Version: 0.0.1
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -7,7 +7,9 @@
 <xacro:property name="chassisX" value="0.2"/>
 <xacro:property name="chassisY" value="0.16"/>
 <xacro:property name="chassisZ" value="0.06"/>
-<xacro:property name="chassisMass" value="0.710"/>
+<!-- <xacro:property name="chassisMass" value="0.710"/> -->
+<xacro:property name="chassisMass" value="1.219"/>
+
 
 <xacro:property name="casterRadius" value="0.0065"/>
 <xacro:property name="casterMass" value="0.012"/>
@@ -28,5 +30,6 @@
 <xacro:property name="mesh_chassis"  value="$(find puzzlebot_gazebo)/meshes/chassis.stl" />
 <xacro:property name="mesh_wheel"  value="$(find puzzlebot_gazebo)/meshes/wheel.stl" />
 <xacro:property name="mesh_camera"  value="$(find puzzlebot_gazebo)/meshes/camera.stl" />
+<xacro:property name="mesh_lidar"  value="$(find puzzlebot_gazebo)/meshes/lidar.stl" />
 
 </robot>

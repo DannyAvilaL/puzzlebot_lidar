@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/liangyichen/catkin_ws/src/puzzlebot/puzzlebot_gazebo/build/devel/setup.sh

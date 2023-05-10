@@ -265,7 +265,7 @@ def main():
 				
 			else:
 				print("Arrived to goal")
-				msg.angular.z = 0.1
+				msg.angular.z = 0.0
 				msg.linear.x = 0.0
 				msg.linear.y = 0.0
 				

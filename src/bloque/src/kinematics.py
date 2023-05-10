@@ -14,7 +14,7 @@ from std_srvs.srv import Empty, EmptyResponse
 rospy.init_node('odometry_publisher')
 
 # ========= PUBLICADORES A TOPICOS =================
-odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
+odom_pub = rospy.Publisher("/odom", Odometry, queue_size=50)
 cmdVel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 pJS = rospy.Publisher("/joint_states", JointState, queue_size=10)
 pPose = rospy.Publisher('/pose', PoseStamped, queue_size=10)
@@ -36,7 +36,7 @@ t0 = 0
 # vy = 0.0
 # vth = 0.0
 r, l = 0.05, 0.188
-v, w = 0.1, 0.1
+v, w = 0.0, 0.0
 current_time = rospy.Time.now()
 last_time = rospy.Time.now()
 newT, mu = 0, 0
@@ -116,7 +116,8 @@ if __name__ == "__main__":
             # delta_x = (vx * cos(th) - vy * sin(th)) * dt
             # delta_y = (vx * sin(th) + vy * cos(th)) * dt
             # delta_th = vth * dt
-
+            v = r*(wl + wr)/2
+            w = r*(wr - wl)/ l
             mu[0] += dt * v * np.cos(th)
             mu[1] += dt * v * np.sin(th)
             mu[2] += dt * w
@@ -139,7 +140,7 @@ if __name__ == "__main__":
                 odom_quat,
                 current_time,
                 "odom",
-                "map"
+                "world"
             )
 
 
@@ -148,14 +149,8 @@ if __name__ == "__main__":
             odom = Odometry()
             odom.header.stamp = current_time
             # odom.header.frame_id = "base_footprint"
-            odom.header.frame_id = "map"
+            odom.header.frame_id = "world"
             odom.child_frame_id = "base_link"
-            # odom.pose.covariance[0]  = 0.1 #0.01
-            # odom.pose.covariance[7]  = 0.7 #0.01
-            # odom.pose.covariance[14] = 0 # 1
-            # odom.pose.covariance[21] = 0 #1
-            # odom.pose.covariance[28] = 0 #1
-            # odom.pose.covariance[35] = 0.1 #0.01
             cov = np.zeros(36) #+ sigma.flatten().tolist()
             # cov = sigma.flatten().tolist()
             sig = sigma.flatten().tolist()
@@ -169,12 +164,6 @@ if __name__ == "__main__":
             odom.pose.covariance[30]  = sig[6]
             odom.pose.covariance[31]  = sig[7]
             odom.pose.covariance[35]  = sig[8]
-            # cov = sigma.flatten().tolist()
-            # cov[0:6] = sigma.flatten().tolist()[0:6]
-            # cov[-3:] = sigma.flatten().tolist()[6:]
-            # print("COVARIANZA:", cov)
-            # odom.pose.covariance = cov
-            #odom.twist.covariance = cov
             print(odom.pose.covariance)
 
             # posicion
@@ -195,18 +184,18 @@ if __name__ == "__main__":
             robotLocation.header.stamp = cTime
             robotLocation.header.frame_id = "base_link"
             pPose.publish(robotLocation)
-            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "map")
+            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "world")
            
             js = JointState()
             js.name = ["right_wheel_joint", "left_wheel_joint"]
             js.position = [wr*t, wl*t]
             js.header.stamp = cTime
             pJS.publish(js)
-            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "map")
+            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "world")
             last_time = current_time
 
 
-            cmdVel.publish(vel)
+            #cmdVel.publish(vel)
 
 
             rate.sleep()

@@ -9,7 +9,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 scan = None
 odom = None
-wall_dist = 0.8
+wall_dist = 0.7
 w_max = 1
 v_max = 1
 
@@ -21,7 +21,7 @@ right_wall = False
 
 r, l = 0.05, 0.188
 
-goal_x, goal_y = (4.0,4.0) # El punto debe estar en decimales  (4.0,4.0)
+goal_x, goal_y = (3.0,3.0) # El punto debe estar en decimales 
 # (-1.0,3.0)
 robot_x = 0.0
 robot_y = 0.0
@@ -29,10 +29,6 @@ robot_y = 0.0
 def scan_callback(msg):
 	global scan
 	scan = msg
-	scan.ranges = np.array(map(lambda x: x if x != np.inf else scan.range_max, scan.ranges)) 
-
-	#if scan is not None:
-		#scan.ranges = np.array(map(lambda x: xif x != np.inf else scan.range_max), scan.ranges) 
 
 
 def odom_callback(msg):
@@ -124,37 +120,30 @@ def go_to_wall():
 	#falta la transformada en quaterinion.
 	angle_error = angle_goal - yaw
 	msg.angular.z = angle_error
-	vel_pub.publish(msg)
 
-	#front_wall = False
+	front_wall = False
 	if scan.ranges[573] < wall_dist:
-		#print('muro enfrente')
-		
+		print('muro enfrente')
+		front_wall = True
 		msg.linear.x = 0
 		msg.linear.y = 0
-		vel_pub.publish(msg)
-		return True
-		#msg.angular.z = 0.2
+		msg.angular.z = 0.3
 	else:
-		
-		return False
-	
+		front_wall = False
+	vel_pub.publish(msg)
+	return front_wall
 
 def id_right_wall():
 	global right_wall
 	right_wall = False
 	if scan.ranges[286] < wall_dist + 0.5:
 		right_wall = True
-
-	return right_wall
 	
 def id_left_wall():
 	global left_wall
 	left_wall = False
 	if scan.ranges[859] < wall_dist + 0.5:
 		left_wall = True
-	
-	return left_wall
 
 
 def range_index(angle):
@@ -194,34 +183,31 @@ def find_wall_direction(hipotenusa, adyacente):
 
 	return alpha
 
-def position_check():
-	
-	pass
-
 def follow_right_hand_wall():
 	print('--------------------SIGUIENDO MURO-----------------')
-	distance_to_right = get_distance_in_sector(88, 91)
+	distance_to_right = get_distance_in_sector(70, 74)
 	alpha = find_wall_direction(70, 90)
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = 0.30
+	distanciaDerechaDeseado = 0.5
 
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 
 	errorAngulo = anguloDerechaDeseado - alpha
 	errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
 
-	#print('alpha: ' + str(alpha) + ' distanciaDerecha: ' + str(distanciaDerecha) + ' error angulo: ' + str(errorAngulo) + ' error distancia: ' + str(errorDistancia))
-	
-	kp_alpha = 0.9
+	print('alpha: ' + str(alpha) + ' distanciaDerecha: ' + str(distanciaDerecha) + ' error angulo: ' + str(errorAngulo) + ' error distancia: ' + str(errorDistancia))
+
+	kp_alpha = 0.7
 	kp_dist = 1
-	if scan.ranges[573] < wall_dist:
-		v = 0.1
-		w = 0.7
+
+	if scan.ranges[573] < 1:
+		v = 0.2
+		w = 0.5
 	else:
 		v = 0.2
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
-	
-		
+	#w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
+
 	if w > w_max:
 		w = w_max
 	elif w < -w_max:
@@ -239,47 +225,37 @@ def main():
 	m = calculate_m()
 	print("Slope: ", m)
 
+
 	aligned = False
 	obstacle_found = False
-	follow_wall= False
-	iteraciones = 0
+
+	
 	while not rospy.is_shutdown():
 		msg = Twist()
 		if scan is not None and odom is not None:
-			print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
+			print("Diff Y: ", round(abs(goal_y - robot_y), 3), "POSY", robot_y)
+			print("Diff X: ", round(abs(goal_x - robot_x), 3), "POSX", robot_x)
 			# MIENTRAS LA POS DEL ROBOT NO ESTE DEMASIADO CERCA DEL PUNTO P
 			if  (round(abs(goal_y - robot_y), 3) >= 0.2 or round(abs(goal_x - robot_x), 3) >= 0.2):
-				if obstacle_found and follow_wall:
-					print("obstacle_found", obstacle_found, iteraciones)	
+				if obstacle_found:
 					follow_right_hand_wall()
-					iteraciones += 1
-					if abs(m*robot_x - robot_y) <= 0.5 and iteraciones >= 20000:
-						follow_wall = False
-					
-					
 				else:
-					obstacle_found = go_to_wall()
-					if obstacle_found:
-						iteraciones = 0
-						follow_wall = True
-				
+					obsstacle_found = go_to_wall()
+					#aligned = turn_to_goal()
 			else:
 				print("Arrived to goal")
 				msg.angular.z = 0.1
 				msg.linear.x = 0.0
 				msg.linear.y = 0.0
-				
 				vel_pub.publish(msg)
 
-	print("Arrived to line")
-	msg.angular.z = 0.0
-	msg.linear.x = 0.0
-	msg.linear.y = 0.0
-	
-	vel_pub.publish(msg)
+			# Avanza mientras NO haya obstaculo
+				# Right hand mientras que NO empate en Y con la recta proyectada
+			
+
 if __name__ == '__main__':
 	try:
-		rospy.init_node('bug0_node')
+		rospy.init_node('bug2_node')
 		scan_listener = rospy.Subscriber('/scan', LaserScan, scan_callback)
 		odom_listener = rospy.Subscriber('/odometry',  Odometry, odom_callback)
 		vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)

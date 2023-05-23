@@ -177,7 +177,7 @@ def node():
 			pWl.publish(wl)
 			pWr.publish(wr)
 			
-		pCMvel.publish(vel)
+		#pCMvel.publish(vel)
 		
 		robotLocation.pose.position= Point(x,y,0)
 		qRota = tf.transformations.quaternion_from_euler(0,0,q)
@@ -213,7 +213,7 @@ if __name__ == '__main__':
 		rospy.Subscriber("/cmd_vel", Twist, callback_top)
 		pCMvel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 		pJS = rospy.Publisher("/joint_states", JointState, queue_size=10)
-		odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
+		odom_pub = rospy.Publisher("/odometry", Odometry, queue_size=50)
 		t = 0
 		fs = 50
 		rate = rospy.Rate(fs)

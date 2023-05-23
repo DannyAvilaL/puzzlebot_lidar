@@ -18,7 +18,7 @@ class RightHandRuleController:
         v_max  : float
            Max linear velocity
         """
-        self.scan_listener = rospy.Subscriber('/scan', LaserScan,
+        self.scan_listener = rospy.Subscriber('/laser/scan', LaserScan,
                                               self.scan_callback)
         self.vel_pub = rospy.Publisher('/cmd_vel' , Twist, queue_size=1 )
         self.rate = rospy.Rate(10.0)
@@ -49,7 +49,7 @@ class RightHandRuleController:
     def follow_right_hand_wall(self):
         found_wall = False
         w = 0
-        v = 0.5
+        v = 0.1 # 0.6
         while not rospy.is_shutdown():
 
             if self.scan is not None:
@@ -78,19 +78,22 @@ class RightHandRuleController:
                 errorAngulo = anguloDerechaDeseado - alpha
                 errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
 
-                kp_alpha = 0.9
-                kp_dist = 1.2
+                kp_alpha = 2.5
+                kp_dist = 3
 
                 print(errorDistancia, "PARED error")
 
-                if distance_ahead < 1.5:
+                if self.scan.ranges[360] < 1.5:
                     print("FRENTE PARED ===")
-                    v = 0.25
-                    w =  0.8
+                    v = 0.5
+                    w =  0.9
                 else:
+                    #pass
+                    v = 0.6
                     w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
+                #w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 
-                limVelocidad = 1
+                limVelocidad = 2
                 #saturacion
                 if w > limVelocidad:
                     w = limVelocidad
@@ -229,6 +232,5 @@ if __name__ == '__main__':
     #rhw.go_to_wall()
     rhw.follow_right_hand_wall()
     
-
 
 

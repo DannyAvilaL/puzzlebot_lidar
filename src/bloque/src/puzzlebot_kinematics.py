@@ -152,7 +152,7 @@ def node():
 			pWl.publish(0)
 			pWr.publish(0)
 			
-		pCMvel.publish(vel)
+		#pCMvel.publish(vel)
 		
 		robotLocation.pose.position= Point(x,y,0)
 		qRota = tf.transformations.quaternion_from_euler(0,0,q)

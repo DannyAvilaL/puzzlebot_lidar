@@ -1,0 +1,14 @@
+material aruco_tag_1
+{
+  technique
+  {
+    pass
+    {  
+      texture_unit
+      {
+        texture 7.png
+        scale 1 1
+      }
+    }
+  }
+}

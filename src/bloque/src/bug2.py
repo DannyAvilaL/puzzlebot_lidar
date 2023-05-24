@@ -21,7 +21,7 @@ right_wall = False
 
 r, l = 0.05, 0.188
 
-goal_x, goal_y = (6.0,-1.0) # El punto debe estar en decimales  (4.0,4.0)
+goal_x, goal_y = (-2.0, 4.0) # El punto debe estar en decimales  (4.0,4.0)
 # (-1.0,3.0)
 robot_x = 0.0
 robot_y = 0.0
@@ -281,7 +281,7 @@ if __name__ == '__main__':
 	try:
 		rospy.init_node('bug2_node')
 		scan_listener = rospy.Subscriber('/scan', LaserScan, scan_callback)
-		odom_listener = rospy.Subscriber('/odometry',  Odometry, odom_callback)
+		odom_listener = rospy.Subscriber('/odom',  Odometry, odom_callback)
 		vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 		rate = rospy.Rate(10)
 		main()

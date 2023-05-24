@@ -24,7 +24,7 @@ class MyOdometryPublisher():
         self.l = 0.18
         self.wheel_r = 0.05
         # Publish to the odometry topic
-        self.odom_pub = rospy.Publisher("/odometry", Odometry, queue_size=1)
+        self.odom_pub = rospy.Publisher("/odom", Odometry, queue_size=1)
         # Publish the simpler (estimated) state to separate topics
         self.x_pub = rospy.Publisher("/est_state/x", Float64, queue_size=1)
         self.y_pub = rospy.Publisher("/est_state/y", Float64, queue_size=1)

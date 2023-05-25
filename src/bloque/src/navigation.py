@@ -11,8 +11,8 @@ scan = None
 odom = None
 
 WALL_DIST = 0.5
-W_MAX = 1
-V_MAX = 1
+W_MAX = 0.5
+V_MAX = 0.4
 R, L = 0.05, 0.188
 
 w = 0
@@ -23,10 +23,14 @@ right_wall = False
 
 # Goal must be in decimals
 goal_list = [(-2.0, 3.0), (-1.0, 8.0), (1.0, 5.0), (0.0, 0.0)]
+
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0
 robot_y = 0.0
 
+def get_new_goal():
+	for i in goal_list:
+		yield i
 
 def scan_callback(msg):
 	global scan
@@ -57,18 +61,12 @@ def turn_to_goal():
 	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
 	#falta la transformada en quaterinion.
 	angle_error = angle_goal - yaw
-	#return angle_error
-	msg.angular.z = angle_error
-
-	#print("Turn2goal, error & angulo", angle_error, angle_goal)#, odom.pose.pose.orientation.w)
-
-	vel_pub.publish(msg)
-	#00078409461195938501 -> 0.008
-
 	if abs(round(angle_error, 3)) <= 0.1:
-		return True
+		return angle_error, True
 	else:
-		return False
+		return angle_error, False
+
+
 	
 
 def near_obstacle(dist=WALL_DIST):
@@ -79,11 +77,10 @@ def near_obstacle(dist=WALL_DIST):
 	Returns:
 		boolean
 	"""
-	if get_distance_in_sector(-10, 10) <= dist:
+	if get_distance_in_sector(-10, 0) <= dist or get_distance_in_sector(0, 10) <= dist:
 		return True
 	else:
 		return False
-
 
 
 def calculate_m():
@@ -133,17 +130,23 @@ def go_to_wall():
 	global front_wall
 	print('--------------------BUSCANDO MURO ENFRENTE-----------------')
 	msg = Twist()
-	msg.linear.x = 0.2
+	msg.linear.x = 0.3
 	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
 	orientation_q = odom.pose.pose.orientation
 	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
 	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
 	#falta la transformada en quaterinion.
 	angle_error = angle_goal - yaw
+
+	if angle_error >= W_MAX:
+		angle_error = W_MAX
+	elif angle_error <= -W_MAX:
+		angle_error = -W_MAX
+
 	msg.angular.z = angle_error
 	vel_pub.publish(msg)
 
-	if scan.ranges[573] < WALL_DIST:
+	if get_distance_in_sector(-5, 5) < WALL_DIST:
 		#print('muro enfrente')
 		msg.linear.x = 0
 		msg.linear.y = 0
@@ -199,8 +202,8 @@ def find_wall_direction(hip, lat):
 	"""
 	Asume que hay una pared en la derecha
 	"""
-	hip = get_distance_in_sector(hip - 3, hip)
-	ady = get_distance_in_sector(lat - 3, lat)
+	hip = get_distance_in_sector(hip - 2, hip)
+	ady = get_distance_in_sector(lat - 2, lat)
 	alpha = np.arctan2(hip*np.sin(np.deg2rad(abs(hip)))-ady,
 		    		   hip*np.cos(np.deg2rad(abs(lat)))) 
 
@@ -216,7 +219,7 @@ def side_check():
 	left_side = get_distance_in_sector(-80, -10)
 	right_side = get_distance_in_sector(10, 80)
 
-	if right_side > left_side:
+	if right_side >= left_side:
 		return "right"
 	else:
 		return "left"
@@ -229,23 +232,23 @@ def follow_right_hand_wall():
 	distance_to_right = get_distance_in_sector(88, 91)
 	alpha = find_wall_direction(70, 90)
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = 0.30
+	distanciaDerechaDeseado = 0.40
 
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 
 	errorAngulo = anguloDerechaDeseado - alpha
 	errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
 	
-	if scan.ranges[573] < WALL_DIST:
-		v = 0.1
-		w = 0.7
+	if get_distance_in_sector(-2, 2) < WALL_DIST:
+		v = 0
+		w = 0.6
 	else:
-		v = 0.2
+		v = 0.3
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 	
-	if w > W_MAX:
+	if w >= W_MAX:
 		w = W_MAX
-	elif w < -W_MAX:
+	elif w <= -W_MAX:
 		w = -W_MAX
 					
 	msg = Twist()
@@ -255,36 +258,35 @@ def follow_right_hand_wall():
 
 
 def follow_left_hand():
-	kp_alpha = 3
-	kp_dist = 2
+	kp_alpha = 2
+	kp_dist = 1
 
 	anguloDerechaDeseado = 0
 	distanciaDerechaDeseado = -0.3
 
 	alpha = find_wall_direction(-45, -90)
 
-	distance_to_right = get_distance_in_sector(np.deg2rad(0 - 90),
-                                               np.deg2rad(0 - 86)
-                                              )
-
+	distance_to_right = get_distance_in_sector(-91, -88)
+	print("DISTANCE", distance_to_right, np.cos(alpha))
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 	errorAngulo = anguloDerechaDeseado + alpha
 	errorDistancia = distanciaDerechaDeseado + distanciaDerecha
 
-	if scan.ranges[360] < 1.5:
+	if get_distance_in_sector(-5, 5) < WALL_DIST:
 		print("WALL AT THE FRONT")
-		v = 0.3
+		v = 0
 		w = -0.5
 	else:
-		v = 0.4
+		v = 0.3
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
+		#print(kp_alpha, errorAngulo, kp_dist, errorDistancia)
+		#print("====")
 
-	limVelocidad = 1.5
 	#saturacion
-	if w > limVelocidad:
-		w = limVelocidad
-	elif w < -limVelocidad:
-		w = -limVelocidad
+	if w >= W_MAX:
+		w = W_MAX
+	elif w <= -W_MAX:
+		w = -W_MAX
 	
 	#rospy.loginfo("{} {} {}".format(errorAngulo, errorDistancia, w))
 					
@@ -296,7 +298,7 @@ def follow_left_hand():
 
 
 def main():
-	global right_wall, front_wall
+	global right_wall, front_wall, goal_y, goal_x
 	msg = Twist()
 	# se calcula la pendiente
 	m = calculate_m()
@@ -306,45 +308,70 @@ def main():
 	towards_goal = False
 	follow_wall= False
 	iteraciones = 0
-	while not rospy.is_shutdown():
-		msg = Twist()
-		if scan is not None and odom is not None:
-			print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
-			# MIENTRAS LA POS DEL ROBOT NO ESTE DEMASIADO CERCA DEL PUNTO P
-			if (round(abs(goal_y - robot_y), 3) >= 0.1 or round(abs(goal_x - robot_x), 3) >= 0.1):
-				if not towards_goal:
-					print("NO ESTA APUNTANDO A GOAL")
-					towards_goal = turn_to_goal()
-				if not near_obstacle():
-					print("NO HAY OBSTACULO EN FRENTE")
-					go_to_wall()
-				else:
-					if not lado_seleccionado:
-						print("SELECCIONADO LADO")
-						lado_seleccionado = side_check()
+	puntos = get_new_goal()
+	try:
+		goal_x, goal_y = next(puntos)
+		while not rospy.is_shutdown():
+			msg = Twist()
+			if scan is not None and odom is not None:
+				print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
+				# MIENTRAS LA POS DEL ROBOT NO ESTE DEMASIADO CERCA DEL PUNTO P
+				robot_angle = turn_to_goal()
+				if (round(abs(goal_y - robot_y), 3) >= 0.1 or round(abs(goal_x - robot_x), 3) >= 0.1):
+					if obstacle_found and follow_wall:
+						print("obstacle_found", obstacle_found, "angulo", robot_angle)	
+						if not lado_seleccionado:
+							print("SELECCIONADO LADO")
+							lado_seleccionado = side_check()
+							t0 = rospy.Time.now().to_sec()	
+							follow_wall = True
+						else:
+							if lado_seleccionado == "right" and follow_wall:
+								print("RIGHT HAND")
+								#follow_left_hand()
+								follow_right_hand_wall()
+								angle_error, _ = robot_angle
+							elif lado_seleccionado == "left" and follow_wall:
+								print("LEFT HAND")
+								#follow_right_hand_wall()
+								follow_left_hand()
+								
+								angle_error, _ = robot_angle
+
+							print("ERROR DE ANGULO", angle_error)
+							tiempo = t0-rospy.Time.now().to_sec()
+							if abs(robot_angle[0]) <= np.deg2rad(2):
+								if (lado_seleccionado == "rigt" and get_distance_in_sector(-30,0) >= 1) or \
+									(lado_seleccionado == "left" and get_distance_in_sector(0, 30) >= 1):
+									follow_wall = False
+
 					else:
-						if lado_seleccionado == "right":
-							print("LEFT HAND")
-							follow_left_hand()
-						elif lado_seleccionado == "left":
-							print("RIGHT HAND")
-							follow_right_hand_wall()
-				
-			else:
-				print("Arrived to goal")
-				msg.angular.z = 0.1
-				msg.linear.x = 0.0
-				msg.linear.y = 0.0
-				
-				vel_pub.publish(msg)
+						obstacle_found = go_to_wall()
 
-		rate.sleep()
+						if obstacle_found or near_obstacle():
+							iteraciones = 0
+							follow_wall = True
+						#		pass
+					
+				else:
+					print("Arrived to goal")
+					#msg.angular.z = 0.1
+					#msg.linear.x = 0.0
+					#msg.linear.y = 0.0
+					
+					#vel_pub.publish(msg)
+					print("Getting new goal")
+					goal_x, goal_y =  next(puntos)
 
-	print("Arrived to line")
-	msg.angular.z = 0.0
-	msg.linear.x = 0.0
-	msg.linear.y = 0.0
-	vel_pub.publish(msg)
+			#rate.sleep()
+	except StopIteration:
+		print("Completed map points")
+		msg.angular.z = 0.0
+		msg.linear.x = 0.0
+		msg.linear.y = 0.0
+		vel_pub.publish(msg)
+		print("Restarting points")
+		puntos = get_new_goal()
 
 
 if __name__ == '__main__':

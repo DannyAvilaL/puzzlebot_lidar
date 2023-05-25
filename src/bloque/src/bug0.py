@@ -21,7 +21,7 @@ right_wall = False
 
 r, l = 0.05, 0.188
 
-goal_x, goal_y = (-2.0,4.0) # El punto debe estar en decimales  (4.0,4.0)
+goal_x, goal_y = (2.0, 5.0) # El punto debe estar en decimales  (4.0,4.0)
 # (-1.0,3.0)
 robot_x = 0.0
 robot_y = 0.0
@@ -215,7 +215,7 @@ def follow_right_hand_wall():
 	kp_alpha = 0.9
 	kp_dist = 1
 	if scan.ranges[573] < wall_dist:
-		v = 0.1
+		v = 0.0
 		w = 0.7
 	else:
 		v = 0.2
@@ -248,24 +248,18 @@ def main():
 		if scan is not None and odom is not None:
 			print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
 			# MIENTRAS LA POS DEL ROBOT NO ESTE DEMASIADO CERCA DEL PUNTO P
+			robot_angle = turn_to_goal()
 			if (round(abs(goal_y - robot_y), 3) >= 0.2 or round(abs(goal_x - robot_x), 3) >= 0.2):
 				if obstacle_found and follow_wall:
-					print("obstacle_found", obstacle_found, iteraciones)	
+					print("obstacle_found", obstacle_found, "angulo", robot_angle)	
 					follow_right_hand_wall()
-					iteraciones += 1
-					prom_abanico = get_distance_in_sector(-70, 70)
-					 
-					if  prom_abanico >= (scan.range_max -1) and iteraciones >= 20000:
-						if abs(turn_to_goal()) <= np.deg2rad(10):
-							follow_wall = False
-					
-					
+					if abs(robot_angle) <= np.deg2rad(2) and get_distance_in_sector(-30,0) >= 1:
+						follow_wall = False	
 				else:
 					obstacle_found = go_to_wall()
 					if obstacle_found:
 						iteraciones = 0
 						follow_wall = True
-				
 			else:
 				print("Arrived to goal")
 				msg.angular.z = 0.1
@@ -273,6 +267,7 @@ def main():
 				msg.linear.y = 0.0
 				
 				vel_pub.publish(msg)
+		rate.sleep()
 
 	print("Arrived to line")
 	msg.angular.z = 0.0

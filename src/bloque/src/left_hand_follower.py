@@ -18,7 +18,7 @@ class RightHandRuleController:
         v_max  : float
            Max linear velocity
         """
-        self.scan_listener = rospy.Subscriber('/laser/scan', LaserScan,
+        self.scan_listener = rospy.Subscriber('/scan', LaserScan,
                                               self.scan_callback)
         self.vel_pub = rospy.Publisher('/cmd_vel' , Twist, queue_size=1 )
         self.rate = rospy.Rate(10.0)
@@ -51,7 +51,7 @@ class RightHandRuleController:
         w = 0
         v = 0.05 # 0.6
         while not rospy.is_shutdown():
-
+            #print(self.scan)
             if self.scan is not None:
                 #--------------------------------------------------------------
                 # Your code here
@@ -87,8 +87,8 @@ class RightHandRuleController:
 
                 kp_alpha = 3
                 kp_dist = 2
-
-                if self.scan.ranges[360] < 1.5:
+                #print( self.scan.ranges[360])
+                if get_distance_in_sector(self.scan, -3, 3) < 1.5:
                     print("FRENTE PARED ===")
                     v = 0.3
                     w = -0.5

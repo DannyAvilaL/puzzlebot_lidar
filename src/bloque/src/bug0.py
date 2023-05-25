@@ -188,7 +188,8 @@ def find_wall_direction(hipotenusa, adyacente):
 	hip = get_distance_in_sector(hipotenusa - 1, hipotenusa)
 	ady = get_distance_in_sector(adyacente - 1, adyacente)
 
-	alpha = np.arctan2(hip*np.sin(np.deg2rad(hipotenusa))-ady, hip*np.cos(np.deg2rad(hipotenusa))) ########################3
+	alpha = np.arctan2(hip*np.sin(np.deg2rad(hipotenusa))-ady, 
+		    hip*np.cos(np.deg2rad(hipotenusa))) ########################3
 
 	#print('hip: ' + str(hip) + ' ady: ' + str(ady) + ' alpha: ' + str(alpha))
 

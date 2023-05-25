@@ -11,8 +11,8 @@ scan = None
 odom = None
 
 WALL_DIST = 0.5
-W_MAX = 0.5
-V_MAX = 0.4
+W_MAX = 0.4
+V_MAX = 0.3
 R, L = 0.05, 0.188
 
 w = 0
@@ -22,7 +22,7 @@ front_wall = False
 right_wall = False
 
 # Goal must be in decimals
-goal_list = [(-2.0, 3.0), (-1.0, 8.0), (1.0, 5.0), (0.0, 0.0)]
+goal_list = [(-2.0, 3.0), (-1.0, 8.0), (1.0, 3.0), (0.0, 0.0)]
 
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0
@@ -130,13 +130,16 @@ def go_to_wall():
 	global front_wall
 	print('--------------------BUSCANDO MURO ENFRENTE-----------------')
 	msg = Twist()
-	msg.linear.x = 0.3
+	msg.linear.x = 0.1
 	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
 	orientation_q = odom.pose.pose.orientation
 	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
 	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
 	#falta la transformada en quaterinion.
 	angle_error = angle_goal - yaw
+
+	if abs(angle_error) >= 35:
+		msg.linear.x = 0
 
 	if angle_error >= W_MAX:
 		angle_error = W_MAX
@@ -146,11 +149,11 @@ def go_to_wall():
 	msg.angular.z = angle_error
 	vel_pub.publish(msg)
 
-	if get_distance_in_sector(-5, 5) < WALL_DIST:
+	if get_distance_in_sector(-15, 15) < WALL_DIST:
 		#print('muro enfrente')
 		msg.linear.x = 0
 		msg.linear.y = 0
-		#msg.angular.z = 0.2
+		msg.angular.z = 0.2
 		vel_pub.publish(msg)
 		return True
 	else:		
@@ -198,15 +201,18 @@ def get_distance_in_sector(start_angle, end_angle):
 	return np.mean(sector_ranges)
 
 
-def find_wall_direction(hip, lat):
+def find_wall_direction(hip, lat, dir):
 	"""
 	Asume que hay una pared en la derecha
 	"""
 	hip = get_distance_in_sector(hip - 2, hip)
 	ady = get_distance_in_sector(lat - 2, lat)
-	alpha = np.arctan2(hip*np.sin(np.deg2rad(abs(hip)))-ady,
-		    		   hip*np.cos(np.deg2rad(abs(lat)))) 
-
+	if dir == "left":
+		alpha = np.arctan2(hip*np.cos(np.deg2rad(abs(hip)))-ady,
+		    		   hip*np.sin(np.deg2rad(abs(lat)))) 
+	elif dir == "right":
+		alpha = np.arctan2(hip*np.sin(np.deg2rad(abs(hip)))-ady,
+		    		   	hip*np.cos(np.deg2rad(abs(hip)))) 
 	return alpha
 
 
@@ -220,30 +226,31 @@ def side_check():
 	right_side = get_distance_in_sector(10, 80)
 
 	if right_side >= left_side:
-		return "right"
-	else:
 		return "left"
+	else:
+		return "right"
 
 
 def follow_right_hand_wall():
-	print('FOLLOWING FROM RIGHT')
-	kp_alpha = 0.9
+	#print('FOLLOWING FROM RIGHT')
+	kp_alpha = 2
 	kp_dist = 1
 	distance_to_right = get_distance_in_sector(88, 91)
-	alpha = find_wall_direction(70, 90)
+	alpha = find_wall_direction(70, 90, "right")
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = 0.40
+	distanciaDerechaDeseado = 0.1
 
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 
 	errorAngulo = anguloDerechaDeseado - alpha
 	errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
-	
-	if get_distance_in_sector(-2, 2) < WALL_DIST:
+	#print("ERROR DISTANCIA", errorDistancia)
+	if get_distance_in_sector(-5, 5) < WALL_DIST:
+		print("WALL AT THE FRONT")
 		v = 0
-		w = 0.6
+		w = 0.5
 	else:
-		v = 0.3
+		v = 0.05
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 	
 	if w >= W_MAX:
@@ -258,26 +265,27 @@ def follow_right_hand_wall():
 
 
 def follow_left_hand():
-	kp_alpha = 2
-	kp_dist = 1
+	kp_alpha = 3
+	kp_dist = 2
 
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = -0.3
+	distanciaDerechaDeseado = -0.1
 
-	alpha = find_wall_direction(-45, -90)
+	alpha = find_wall_direction(-45, -90, "left")
 
-	distance_to_right = get_distance_in_sector(-91, -88)
-	print("DISTANCE", distance_to_right, np.cos(alpha))
+	distance_to_right = get_distance_in_sector(-90, -86)
+	#print("DISTANCE", distance_to_right, np.cos(alpha))
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 	errorAngulo = anguloDerechaDeseado + alpha
 	errorDistancia = distanciaDerechaDeseado + distanciaDerecha
+	#print("ERROR DISTANCIA", errorDistancia)
 
 	if get_distance_in_sector(-5, 5) < WALL_DIST:
 		print("WALL AT THE FRONT")
 		v = 0
 		w = -0.5
 	else:
-		v = 0.3
+		v = 0.05
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 		#print(kp_alpha, errorAngulo, kp_dist, errorDistancia)
 		#print("====")
@@ -319,7 +327,7 @@ def main():
 				robot_angle = turn_to_goal()
 				if (round(abs(goal_y - robot_y), 3) >= 0.1 or round(abs(goal_x - robot_x), 3) >= 0.1):
 					if obstacle_found and follow_wall:
-						print("obstacle_found", obstacle_found, "angulo", robot_angle)	
+						#print("obstacle_found", obstacle_found, "angulo", robot_angle)	
 						if not lado_seleccionado:
 							print("SELECCIONADO LADO")
 							lado_seleccionado = side_check()
@@ -327,22 +335,26 @@ def main():
 							follow_wall = True
 						else:
 							if lado_seleccionado == "right" and follow_wall:
-								print("RIGHT HAND")
+								#print("RIGHT HAND", robot_angle[0])
 								#follow_left_hand()
 								follow_right_hand_wall()
 								angle_error, _ = robot_angle
 							elif lado_seleccionado == "left" and follow_wall:
-								print("LEFT HAND")
+								#print("LEFT HAND", robot_angle[0])
 								#follow_right_hand_wall()
 								follow_left_hand()
 								
 								angle_error, _ = robot_angle
 
-							print("ERROR DE ANGULO", angle_error)
-							tiempo = t0-rospy.Time.now().to_sec()
-							if abs(robot_angle[0]) <= np.deg2rad(2):
-								if (lado_seleccionado == "rigt" and get_distance_in_sector(-30,0) >= 1) or \
-									(lado_seleccionado == "left" and get_distance_in_sector(0, 30) >= 1):
+							#print("ERROR DE ANGULO", angle_error)
+							tiempo = rospy.Time.now().to_sec() - t0
+
+							# si esta apuntando al mismo lado del goal
+							print(abs(angle_error) <= 0.2, tiempo > 3)
+							if abs(angle_error) <= 0.2 and tiempo > 3: 
+								print("VIENDO A GOAL, SALIENDO DE FOLLOW")
+								if (lado_seleccionado == "right" and get_distance_in_sector(-30, 0) >= 1.5) or \
+									(lado_seleccionado == "left" and get_distance_in_sector(0, 30) >= 1.5):
 									follow_wall = False
 
 					else:
@@ -380,7 +392,7 @@ if __name__ == '__main__':
 		scan_listener = rospy.Subscriber('/scan', LaserScan, scan_callback)
 		odom_listener = rospy.Subscriber('/odom',  Odometry, odom_callback)
 		vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-		rate = rospy.Rate(10)
+		rate = rospy.Rate(3)
 		main()
 	except rospy.ROSInterruptException:
 		print("Deteniendo")

@@ -30,7 +30,7 @@
     <arg name="x" default="0.00"/>
     <arg name="y" default="0.00"/>
     <arg name="z" default="0.000"/>
-    <arg name="Y" default="-1.57"/>
+    <arg name="Y" default="0.00"/>
     
   <node name="puzzlebot_spawn" pkg="gazebo_ros" type="spawn_model"  output="screen"
           args="-urdf -param robot_description -model puzzlebot -x $(arg x) -y $(arg y) -z $(arg z) -Y $(arg Y)" />

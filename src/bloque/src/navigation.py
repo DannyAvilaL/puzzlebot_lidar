@@ -23,7 +23,7 @@ right_wall = False
 t0 , t = 0,0
 
 # Goal must be in decimals
-goal_list = [(-2.0, 3.0), (-2.0, 8.0), (1.0, 3.0), (0.0, 0.0)]
+goal_list = [(2.0, 3.0), (8.0, 2.0), (3.0, 1.0), (0.0, 0.0)]
 
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0

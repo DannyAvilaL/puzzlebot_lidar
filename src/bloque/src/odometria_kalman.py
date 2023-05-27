@@ -43,11 +43,11 @@ last_time = rospy.Time.now()
 newT = 0
 rate = rospy.Rate(10)
 wr = wl = 0.0
-M = {0: [-0.604925, 0.518921], 1: [-0.471944, -0.644169], 3: [0.37264, -0.436694]}
+M = {0: [2, -1], 1: [5, -2], 3: [9, 1]}
 medicion_ArUco, ArUco_id = Pose2D(), -1
 
 # =========== MATRICES DE APOYO ===========
-mu = np.array([x, y, th])
+mu = np.array([x, y, th]).T
 
 sigma = np.array([[0.0, 0.0, 0.0],
          [0.0, 0.0, 0.0],
@@ -97,7 +97,7 @@ rospy.Subscriber('/pose_aruco', Pose2D, callback_medicion_ArUco)
 
 
 def EKF(Muk_ant, sigmak_ant, Zik, Rk):
-    global ArUco_id, medicion_ArUco, x, y, th
+    global ArUco_id
     '''
     Inputs
         -Muk_ant: vector mu obtenido
@@ -110,57 +110,29 @@ def EKF(Muk_ant, sigmak_ant, Zik, Rk):
     '''
     Zik = np.array(Zik)
     Muk = Muk_ant 
-    #Hk = [[1, 0, -delta_t * uk[0] * sin(Muk_ant[2])],
-    #      [0, 1,  delta_t * uk[0] * cos(Muk_ant[2])],
-    #      [0, 0, 1]]
-    #sigmak_e = Hk * sigmak_ant * Hk.T + Qk
     sigmak = sigmak_ant
 
     if (ArUco_id != -1):###############si ve aruco, mi - coordenada
         delta_x = M[ArUco_id][0] - Muk[0]
         delta_y = M[ArUco_id][1] - Muk[1]
         p = delta_x**2 + delta_y**2
-        Gk = np.array([[-delta_x/p**0.5, -delta_y/p**0.5, 0],
-              [delta_y/p,        delta_x/p,     -1]])
+        Gk = np.array([[-delta_x/(p**0.5), -delta_y/(p**0.5), 0],
+              [delta_y/p,        -delta_x/p,     -1]])
         
-        Zik_e = np.array([(p)**0.5,
+        Zik_e = np.array([p**0.5,
                  np.arctan2(delta_y, delta_x) - Muk[2]]) 
         
         Zk = np.dot(Gk, np.dot(sigmak, Gk.T)) + Rk
 
         Kk = np.dot(sigmak, np.dot(Gk.T, np.linalg.inv(Zk)))
         #resta en ecuacion de Manchester: Zik - Zik_e
-        Muk = Muk + np.dot(Kk, (Zik - Zik_e))
+        Muk += np.dot(Kk, (Zik - Zik_e))
+        print("Diferencias Zk y Zke", Zik - Zik_e)
 
         I = np.eye(3) 
         sigmak = np.dot((I - np.dot(Kk, Gk)), sigmak)
 
     return Muk, sigmak
-
-
-
-#Gk - modelo linealizado de la medicion (se linealiza utilizando jacobiano)
-#    delta_x = mx(i) - estado estimado(somb)(sx,k)
-#    delta_y = my(i) - estado estimado(somb)(sy,k)
-#    p = delta_x**2 + delta_y**2
-#    Gk = [[-delta_x/p**0.5, -delta_y/p**0.5, 0],
-#          [delta_y/p, delta_x/p, -1]]
-
-
-#    Hk = [[1, 0, -delta_t*vk*sin(mu_th,k-1)],
-#          [0, 1, delta_t*vk*cos(mu_th,k-1)],
-#          [0, 0, 1]]
-
-# M - mapa donde estan los landmarks(obstaculos) que se miden con los sensores
-# distribucion gaussiana anterior dada por 2 parametros, muk-1 y sigmak-1
-# Uk - ley de control que se aplica al instante k-1 para moverse al instante k. 
-# uk=[vk(velocidad lineal), wk(velocidad angular)].T
-# zik - una vez en el instante k se toma una medicion
-# Qk - covarianza del modelo cinematico
-# Rk - covarianza para la medicion
-# m(j) - obstaculo en el mapa, j - numeracion
-# mi = [mx(i), my(i)].T
-# qk = [qxk, qyk, qthk].T 
 
 def calculoQK():
     global QK
@@ -171,8 +143,8 @@ def calculoQK():
     dif_wT = dif_w.transpose()
     
     kr, kl = 1, 1
-    varianza = [[kr*wr, 0],
-                [0, kl * wl]]
+    varianza = [[kr*abs(wr), 0],
+                [0, kl * abs(wl)]]
 
     QK = np.dot(dif_w, np.dot(varianza, dif_wT))
 
@@ -180,9 +152,9 @@ def calculoQK():
 def propagacionError(dt, v, th):
     global sigma
     #Jacobiano
-    H = np.array([[1.0, 0.0, -dt * v * np.sin(th)],
-         [0.0, 1.0, dt * v * np.cos(th)],
-         [0.0, 0.0, 1.0]])
+    H = np.array([  [1.0, 0.0, -dt * v * np.sin(mu[2])],
+                    [0.0, 1.0, dt * v * np.cos(mu[2])],
+                    [0.0, 0.0, 1.0]])
     
     HT = H.transpose()
     calculoQK()
@@ -210,15 +182,24 @@ if __name__ == "__main__":
             y += dt * v * np.sin(th)
             th += (dt * w)
 
-            if th >= np.pi or th <= -np.pi:
-                th = 0
-                mu[2] = 0
+            if th >= np.pi:
+                th = -pi
+                mu[2] = -pi
+            elif th <= -np.pi:
+                th = pi
+                mu[2] = pi
 
             # para joints de llantas
             # wl = (v - 0.5*l*w)/r
             # wr = (v + 0.5*l*w)/r
+            # cov = sigma.flatten().tolist()
+            Zik = [medicion_ArUco.x, medicion_ArUco.theta] 
+            error = 0.1
+            Rk = np.eye((2)) * error
+            mu, sigma = EKF(mu, sigma, Zik, Rk)
+            sig = sigma.flatten().tolist()
 
-            odom_quat = tf.transformations.quaternion_from_euler(0, 0, th)
+            x, y, odom_quat = mu[0], mu[1], tf.transformations.quaternion_from_euler(0, 0, mu[2])
             vel.linear.x = v
 
             vel.angular.z = w
@@ -240,13 +221,7 @@ if __name__ == "__main__":
             odom.header.frame_id = "world"
             odom.child_frame_id = "base_link"
             cov = np.zeros(36) #+ sigma.flatten().tolist()
-            # cov = sigma.flatten().tolist()
-            Zik = [medicion_ArUco.x, medicion_ArUco.theta]
-            error = 0.1
-            Rk = np.eye((2)) * error
 
-            mu, sigma = EKF(mu, sigma, Zik, Rk)
-            sig = sigma.flatten().tolist()
             
             odom.pose.covariance[0]  = sig[0]
             odom.pose.covariance[1]  = sig[1]

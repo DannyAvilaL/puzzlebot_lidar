@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
 import math
+from cv2 import aruco
 from math import sin, cos, pi
 import rospy
 import tf
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
+from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, Pose2D
 import numpy as np
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Int32
 from std_srvs.srv import Empty, EmptyResponse
 
 rospy.init_node('odometry_publisher')
@@ -39,9 +40,12 @@ r, l = 0.05, 0.188
 v, w = 0.0, 0.0
 current_time = rospy.Time.now()
 last_time = rospy.Time.now()
-newT, mu = 0, 0
+newT = 0
 rate = rospy.Rate(10)
 wr = wl = 0.0
+M = {0: [-0.604925, 0.518921], 1: [-0.471944, -0.644169], 3: [0.37264, -0.436694]}
+medicion_ArUco, ArUco_id = Pose2D(), -1
+
 # =========== MATRICES DE APOYO ===========
 mu = np.array([x, y, th])
 
@@ -65,7 +69,7 @@ def callback_ser(req):
 
 ser = rospy.Service("/reset", Empty, callback_ser)
 
-# ========== SUSCRIPTIORES ==========0
+# ========== SUSCRIPTORES ==========0
 def callback_wl(msg):
     global wl
     wl = msg.data
@@ -74,9 +78,89 @@ def callback_wr(msg):
     global wr
     wr = msg.data
 
+def callback_ArUco(msg):
+    global ArUco_id
+    ArUco_id = msg.data
+
+def callback_medicion_ArUco(msg):
+    global medicion_ArUco
+    medicion_ArUco.x = msg.x
+    medicion_ArUco.y = msg.y
+    medicion_ArUco.theta = msg.theta
+
+    
 
 rospy.Subscriber("/wl", Float32, callback_wl)
 rospy.Subscriber("/wr", Float32, callback_wr)
+rospy.Subscriber('/aruco_detected', Int32, callback_ArUco)
+rospy.Subscriber('/pose_aruco', Pose2D, callback_medicion_ArUco)
+
+
+def EKF(Muk_ant, sigmak_ant, Zik, Rk):
+    global ArUco_id, medicion_ArUco, x, y, th
+    '''
+    Inputs
+        -Muk_ant: vector mu obtenido
+        -sigmak_ant: matriz sigma obtenida
+        -Zik: medicion
+        -Rk: Covarianza para la medicion
+    Outputs
+        -Muk
+        -sigmak
+    '''
+    Zik = np.array(Zik)
+    Muk = Muk_ant 
+    #Hk = [[1, 0, -delta_t * uk[0] * sin(Muk_ant[2])],
+    #      [0, 1,  delta_t * uk[0] * cos(Muk_ant[2])],
+    #      [0, 0, 1]]
+    #sigmak_e = Hk * sigmak_ant * Hk.T + Qk
+    sigmak = sigmak_ant
+
+    if (ArUco_id != -1):###############si ve aruco, mi - coordenada
+        delta_x = M[ArUco_id][0] - Muk[0]
+        delta_y = M[ArUco_id][1] - Muk[1]
+        p = delta_x**2 + delta_y**2
+        Gk = np.array([[-delta_x/p**0.5, -delta_y/p**0.5, 0],
+              [delta_y/p,        delta_x/p,     -1]])
+        
+        Zik_e = np.array([(p)**0.5,
+                 np.arctan2(delta_y, delta_x) - Muk[2]]) 
+        
+        Zk = np.dot(Gk, np.dot(sigmak, Gk.T)) + Rk
+
+        Kk = np.dot(sigmak, np.dot(Gk.T, np.linalg.inv(Zk)))
+        #resta en ecuacion de Manchester: Zik - Zik_e
+        Muk = Muk + np.dot(Kk, (Zik - Zik_e))
+
+        I = np.eye(3) 
+        sigmak = np.dot((I - np.dot(Kk, Gk)), sigmak)
+
+    return Muk, sigmak
+
+
+
+#Gk - modelo linealizado de la medicion (se linealiza utilizando jacobiano)
+#    delta_x = mx(i) - estado estimado(somb)(sx,k)
+#    delta_y = my(i) - estado estimado(somb)(sy,k)
+#    p = delta_x**2 + delta_y**2
+#    Gk = [[-delta_x/p**0.5, -delta_y/p**0.5, 0],
+#          [delta_y/p, delta_x/p, -1]]
+
+
+#    Hk = [[1, 0, -delta_t*vk*sin(mu_th,k-1)],
+#          [0, 1, delta_t*vk*cos(mu_th,k-1)],
+#          [0, 0, 1]]
+
+# M - mapa donde estan los landmarks(obstaculos) que se miden con los sensores
+# distribucion gaussiana anterior dada por 2 parametros, muk-1 y sigmak-1
+# Uk - ley de control que se aplica al instante k-1 para moverse al instante k. 
+# uk=[vk(velocidad lineal), wk(velocidad angular)].T
+# zik - una vez en el instante k se toma una medicion
+# Qk - covarianza del modelo cinematico
+# Rk - covarianza para la medicion
+# m(j) - obstaculo en el mapa, j - numeracion
+# mi = [mx(i), my(i)].T
+# qk = [qxk, qyk, qthk].T 
 
 def calculoQK():
     global QK
@@ -105,7 +189,7 @@ def propagacionError(dt, v, th):
     sigma = np.dot(np.dot(H,sigma),HT) + QK
     #sigma = (H * sigma * HT) + QK
 
-last_time = rospy.Time().now()
+last_time = rospy.Time.now()
 # ============ FLUJO PRINCIPAL ============
 if __name__ == "__main__":
     try:
@@ -124,7 +208,11 @@ if __name__ == "__main__":
 
             x += dt * v * np.cos(th)
             y += dt * v * np.sin(th)
-            th += dt * w
+            th += (dt * w)
+
+            if th >= np.pi or th <= -np.pi:
+                th = 0
+                mu[2] = 0
 
             # para joints de llantas
             # wl = (v - 0.5*l*w)/r
@@ -153,8 +241,13 @@ if __name__ == "__main__":
             odom.child_frame_id = "base_link"
             cov = np.zeros(36) #+ sigma.flatten().tolist()
             # cov = sigma.flatten().tolist()
+            Zik = [medicion_ArUco.x, medicion_ArUco.theta]
+            error = 0.1
+            Rk = np.eye((2)) * error
+
+            mu, sigma = EKF(mu, sigma, Zik, Rk)
             sig = sigma.flatten().tolist()
-            print("SIG", sig)
+            
             odom.pose.covariance[0]  = sig[0]
             odom.pose.covariance[1]  = sig[1]
             odom.pose.covariance[5]  = sig[2]
@@ -170,8 +263,8 @@ if __name__ == "__main__":
             odom.pose.pose = Pose(Point(x, y, r), Quaternion(*odom_quat))
             # velocidad
             # odom.child_frame_id = "base_link"
-            print(Vector3(mu[0], mu[1], 0))
-            odom.twist.twist = Twist(Vector3(mu[0], mu[1], r), Vector3(0, 0, mu[2]))
+            print(Vector3(mu[0], mu[1], mu[2]))
+            odom.twist.twist = Twist(Vector3(v, 0 , 0), Vector3(0, 0, w))
 
             odom_pub.publish(odom)
 

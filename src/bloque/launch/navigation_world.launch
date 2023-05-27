@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+<!-- Set up env variable so plugin and textures are found -->
+  <env name="GAZEBO_PLUGIN_PATH" value="$(find puzzlebot_world)/plugins"/> 
+  <env name="GAZEBO_MODEL_PATH" value="$(find puzzlebot_world)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="$(find puzzlebot_world)/models" />
+
+ <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
+  
+  <include file="$(find puzzlebot_world)/launch/puzzlebot_my_world.launch" />
+
+
+  <!-- bloque\urdf -->
+  <rg name="model" default="$(find xacro)/xacro --inorder '$(find puzzlebot_gazebo)/urdf/puzzlebot.xacro'"/>
+  <arg name="rvizconfig" default="$(find bloque)/rviz/config.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true"/>
+  <!-- <node pkg="puzzlebot_nav2d" type="challenge2.py" name="puzzlebot_kinematic_model_1" /> -->
+  <node pkg="bloque" type="odometria_kalman.py" name="odometry_publisher"/>
+  <!-- Nodo de arucos-->
+  <node pkg="bloque" type="aruco_detection.py" name="aruco_detection"/>
+  <!---->
+
+
+</launch>
+

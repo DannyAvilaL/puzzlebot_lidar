@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <node pkg="bloque" type="odometria_kalman.py" name="odometry_publisher"/>
+  <!-- Aruco detector-->
+  <!-- <node pkg="bloque" type="aruco_detection.py" name="aruco_detection"/> -->
+  <!--navegation nodo
+  <node pkg="bloque" type="navigation.py" name="navigation_node"/>
+  -->
+</launch>
+

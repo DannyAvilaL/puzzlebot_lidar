@@ -31,6 +31,7 @@
     <arg name="y" default="0.00"/>
     <arg name="z" default="0.000"/>
     <arg name="Y" default="0.00"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="map to world" args="0 0 0 0 0 0 1 /map /world"> </node> 
     
   <node name="puzzlebot_spawn" pkg="gazebo_ros" type="spawn_model"  output="screen"
           args="-urdf -param robot_description -model puzzlebot -x $(arg x) -y $(arg y) -z $(arg z) -Y $(arg Y)" />
@@ -43,7 +44,8 @@
 
   <node name="puzzlebot_controller" pkg="puzzlebot_control" type="puzzlebot_control_node"/>
 
-<include file="$(find puzzlebot_control)/launch/puzzlebot_control.launch"/>"
+  <include file="$(find puzzlebot_control)/launch/puzzlebot_control.launch"> </include>
+
 
 </launch>
 

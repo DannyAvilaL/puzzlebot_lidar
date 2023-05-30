@@ -6,7 +6,7 @@ material aruco_tag_4
     {  
       texture_unit
       {
-        texture 04.png
+        texture 100.png
         scale 1 1
       }
     }

@@ -325,7 +325,7 @@ def follow_right_hand_wall():
 	
 	kp_alpha = 0.9
 	kp_dist = 1
-	if scan.ranges[573] < WALL_FRONT_DIST:
+	if get_distance_in_sector(0, 3) < 1:
 		v = 0.0
 		w = 0.7
 	else:
@@ -343,7 +343,7 @@ def follow_right_hand_wall():
 	msg.linear.x = v
 	vel_pub.publish(msg)
 
-	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
+	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= (scan.range_min+scan.range_max)/2 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
 		return True
 	else:
 		return False

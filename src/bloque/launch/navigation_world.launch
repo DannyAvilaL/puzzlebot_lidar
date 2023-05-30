@@ -18,14 +18,13 @@
 
   <!-- bloque\urdf -->
   <rg name="model" default="$(find xacro)/xacro --inorder '$(find puzzlebot_gazebo)/urdf/puzzlebot.xacro'"/>
-  <arg name="rvizconfig" default="$(find bloque)/rviz/config.rviz" />
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true"/>
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find bloque)/rviz/arucos_config.rviz" />
   <!-- <node pkg="puzzlebot_nav2d" type="challenge2.py" name="puzzlebot_kinematic_model_1" /> -->
   <node pkg="bloque" type="odometria_kalman.py" name="odometry_publisher"/>
   <!-- Nodo de arucos-->
-  <node pkg="bloque" type="aruco_detection.py" name="aruco_detection"/>
-  <!---->
+  <!-- <node pkg="bloque" type="aruco_detection.py" name="aruco_detection"/> -->
+
+  
 
 
 </launch>
-

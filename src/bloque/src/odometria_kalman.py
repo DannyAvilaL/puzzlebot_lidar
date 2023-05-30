@@ -5,12 +5,16 @@ from cv2 import aruco
 from math import sin, cos, pi
 import rospy
 import tf
+import tf2_ros
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, Pose2D
 import numpy as np
 from std_msgs.msg import Float32, Int32
 from std_srvs.srv import Empty, EmptyResponse
+from fiducial_msgs.msg import FiducialTransform, FiducialTransformArray
+from geometry_msgs.msg import TransformStamped, Twist
+
 
 rospy.init_node('odometry_publisher')
 
@@ -24,8 +28,14 @@ pPose = rospy.Publisher('/pose', PoseStamped, queue_size=10)
 # =========== OBJETOS DE POSICION =============
 odom_broadcaster = tf.TransformBroadcaster()
 tb = tf.TransformBroadcaster()
+ta = tf2_ros.TransformBroadcaster()
 vel = Twist()
 robotLocation = PoseStamped()
+
+tfBuffer = tf2_ros.Buffer(rospy.Time(30))
+transformListener = tf2_ros.TransformListener(tfBuffer)
+
+#aruco = FiducialTransformArray()
 
 # ============ VARIABLES INICIALES ===========
 pathFile = "./data_record.txt"
@@ -43,7 +53,7 @@ last_time = rospy.Time.now()
 newT = 0
 rate = rospy.Rate(10)
 wr = wl = 0.0
-M = {0: [2, -1], 1: [5, -2], 3: [9, 1], 4: [3, 4], 5:[8,-2], 6:[8,2]}
+M = {111: [2, -1], 101: [5, -2], 102: [9, 1], 100: [3, 4], 103:[8,-2], 109:[8,2]}
 medicion_ArUco, ArUco_id = Pose2D(), -1
 
 # =========== MATRICES DE APOYO ===========
@@ -88,12 +98,45 @@ def callback_medicion_ArUco(msg):
     medicion_ArUco.y = msg.y
     medicion_ArUco.theta = msg.theta
 
+def callback_fiducials(msg):
+    image_time = msg.header.stamp
+    found = False
     
+    #por cada aruco, se publica su transformada
+    for aruco in msg.transforms:
+        id = aruco.fiducial_id
+        trans = aruco.transform.translation
+        rot = aruco.transform.rotation
+
+        t = TransformStamped()
+        t.child_frame_id = "f_id_" + str(id)
+        t.header.frame_id = msg.header.frame_id
+        t.header.stamp = image_time
+        t.transform.translation.x = trans.x
+        t.transform.translation.y = trans.y
+        t.transform.translation.z = trans.z
+        t.transform.rotation.x = rot.x
+        t.transform.rotation.y = rot.y
+        t.transform.rotation.z = rot.z
+
+        return 
+        aruco_q = tf.transformations.quaternion_from_euler(rot.x, rot.y, rot.z)
+        ta.sendTransform(t)
+
+        tr = tfBuffer.lookup_transform("base_link", t.child_frame_id, image_time)
+        ct = tr.transform.translation
+        cr = tr.transform.rotation
+
+        print("T_fidBase %lf %lf %lf %lf %lf %lf %lf\n" % \
+                             (ct.x, ct.y, ct.z, cr.x, cr.y, cr.z, cr.w))
+
 
 rospy.Subscriber("/wl", Float32, callback_wl)
 rospy.Subscriber("/wr", Float32, callback_wr)
 rospy.Subscriber('/aruco_detected', Int32, callback_ArUco)
 rospy.Subscriber('/pose_aruco', Pose2D, callback_medicion_ArUco)
+
+rospy.Subscriber('/fiducial_transforms', FiducialTransformArray, callback_fiducials)
 
 
 def EKF(Muk_ant, sigmak_ant, Zik, Rk):
@@ -113,6 +156,7 @@ def EKF(Muk_ant, sigmak_ant, Zik, Rk):
     sigmak = sigmak_ant
 
     if (ArUco_id != -1):###############si ve aruco, mi - coordenada
+    #if aruco. fiducial_id in M.keys():
         delta_x = M[ArUco_id][0] - Muk[0]
         delta_y = M[ArUco_id][1] - Muk[1]
         p = delta_x**2 + delta_y**2
@@ -194,6 +238,7 @@ if __name__ == "__main__":
             # wr = (v + 0.5*l*w)/r
             # cov = sigma.flatten().tolist()
             Zik = [medicion_ArUco.x, medicion_ArUco.theta] 
+            #Zik = tf.lookupTransform()
             error = 0.1
             Rk = np.eye((2)) * error
             mu, sigma = EKF(mu, sigma, Zik, Rk)
@@ -209,7 +254,7 @@ if __name__ == "__main__":
                 odom_quat,
                 current_time,
                 "odom",
-                "world"
+                "map"
             )
 
 
@@ -218,7 +263,7 @@ if __name__ == "__main__":
             odom = Odometry()
             odom.header.stamp = current_time
             # odom.header.frame_id = "base_footprint"
-            odom.header.frame_id = "world"
+            odom.header.frame_id = "map"
             odom.child_frame_id = "base_link"
             cov = np.zeros(36) #+ sigma.flatten().tolist()
 
@@ -246,20 +291,20 @@ if __name__ == "__main__":
             cTime = rospy.Time.now()
             
             t = cTime.to_sec() - t0
-            robotLocation.pose.position= Point(x,y,r)
-            qRota = tf.transformations.quaternion_from_euler(0,0,th)
+            robotLocation.pose.position= Point(mu[0],mu[1],r)
+            qRota = tf.transformations.quaternion_from_euler(0,0,mu[2])
             robotLocation.pose.orientation = Quaternion(qRota[0],qRota[1],qRota[2],qRota[3])
             robotLocation.header.stamp = cTime
             robotLocation.header.frame_id = "base_link"
             pPose.publish(robotLocation)
-            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "world")
+            tb.sendTransform([mu[0],mu[1],0], qRota, cTime, "base_link", "map")
            
             js = JointState()
             js.name = ["base_to_right_w", "base_to_left_w"]
             js.position = [wr*t, wl*t]
             js.header.stamp = cTime
             pJS.publish(js)
-            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "world")
+            tb.sendTransform([x,y,0], qRota, cTime, "base_link", "map")
             last_time = current_time
 
 

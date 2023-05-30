@@ -52,7 +52,7 @@ def main():
             frame_markers, maker_corners, maker_ids = aruco_identify(cv_image)
             if np.all(maker_ids != None) and maker_ids[0][0] in lista_arucos:
                 marcador = maker_ids[0][0]
-                rvec, tvec = aruco.estimatePoseSingleMarkers(maker_corners, 0.33, mtx, dist)
+                rvec, tvec,_ = aruco.estimatePoseSingleMarkers(maker_corners, 0.33, mtx, dist)
                 #rvec, tvec,_ = cv2.solvePnP(marker_points, maker_corners, mtx, dist, False, cv2.SOLVEPNP_IPPE_SQUARE)
                 print(rvec)
                 magnitud = np.sqrt(tvec[0][0][0]**2 + tvec[0][0][-1]**2)######

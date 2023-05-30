@@ -49,7 +49,7 @@ class RightHandRuleController:
     def follow_right_hand_wall(self):
         found_wall = False
         w = 0
-        v = 0.1 # 0.6
+        v = 0.3
         while not rospy.is_shutdown():
 
             if self.scan is not None:
@@ -78,18 +78,19 @@ class RightHandRuleController:
                 errorAngulo = anguloDerechaDeseado - alpha
                 errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
 
-                kp_alpha = 2.5
-                kp_dist = 3
+                kp_alpha = 0.7
+                kp_dist = 1
 
                 print(errorDistancia, "PARED error")
 
                 if self.scan.ranges[360] < 1.5:
                     print("FRENTE PARED ===")
-                    v = 0.5
-                    w =  0.9
+                    v = 0.3
+                    w =  0.5
+                    #lineal 0.6 angular 0.9
                 else:
                     #pass
-                    v = 0.6
+                    v = 0.3
                     w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
                 #w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 

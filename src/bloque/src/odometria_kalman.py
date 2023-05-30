@@ -43,7 +43,7 @@ last_time = rospy.Time.now()
 newT = 0
 rate = rospy.Rate(10)
 wr = wl = 0.0
-M = {0: [2, -1], 1: [5, -2], 3: [9, 1]}
+M = {0: [2, -1], 1: [5, -2], 3: [9, 1], 4: [3, 4], 5:[8,-2], 6:[8,2]}
 medicion_ArUco, ArUco_id = Pose2D(), -1
 
 # =========== MATRICES DE APOYO ===========

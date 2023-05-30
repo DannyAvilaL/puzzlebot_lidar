@@ -7,26 +7,26 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge 
 from std_msgs.msg import Int32 
 from geometry_msgs.msg import Pose2D
+import tf
 
 bridge = CvBridge()
 cv_image = None
 dict_aruco = aruco.Dictionary_get(aruco.DICT_4X4_50)
-lista_arucos =[0, 1, 3]
-parameters = aruco.DetectorParameters_create()
+lista_arucos =[0, 1, 3, 4, 5, 6]
 
+parameters = aruco.DetectorParameters_create()
 parameters.adaptiveThreshWinSizeMin = 3
 parameters.adaptiveThreshWinSizeMax = 9
 parameters.adaptiveThreshWinSizeStep = 1
 parameters.errorCorrectionRate = 0.1
 parameters.minMarkerDistanceRate = 30  
-
 parameters.polygonalApproxAccuracyRate = 0.04
 #parameters.minOtsuStdDev = 2
 #parameters.minMarkerPerimeterRate = 0.035
 #parameters.minCornerDistanceRate = 0.035
 mtx = np.array([[800.0,    0.0,  400.0],
-                    [0.0,   800.0,  400.0],
-                    [0.0,    0.0,    1.0]])
+                [0.0,    800.0,  400.0],
+                [0.0,      0.0,    1.0]])
 
 dist = np.array([[0.0, 0.0, 0.0, 0.0, 0.0]])
 
@@ -42,17 +42,21 @@ def aruco_identify(img):
     frame_markers = aruco.drawDetectedMarkers(img.copy(), maker_corners, maker_ids)
     return frame_markers, maker_corners, maker_ids
 
-def main():
 
+def main():
+    marker_size = 0.33
+    
     while not rospy.is_shutdown():
         rate.sleep()
         if cv_image is not None:
             frame_markers, maker_corners, maker_ids = aruco_identify(cv_image)
             if np.all(maker_ids != None) and maker_ids[0][0] in lista_arucos:
                 marcador = maker_ids[0][0]
-                rvec, tvec, _ = aruco.estimatePoseSingleMarkers(maker_corners, 0.9, mtx, dist)
-                magnitud = np.sqrt(tvec[0][0][0]**2 + tvec[0][0][1]**2)
-                pose_aruco.x, pose_aruco.y, pose_aruco.theta = magnitud, 0, rvec[0][0][-1]
+                rvec, tvec = aruco.estimatePoseSingleMarkers(maker_corners, 0.33, mtx, dist)
+                #rvec, tvec,_ = cv2.solvePnP(marker_points, maker_corners, mtx, dist, False, cv2.SOLVEPNP_IPPE_SQUARE)
+                print(rvec)
+                magnitud = np.sqrt(tvec[0][0][0]**2 + tvec[0][0][-1]**2)######
+                pose_aruco.x, pose_aruco.y, pose_aruco.theta = magnitud, 0, np.cos(rvec[0][0][-1]) #######
 
                 for i in range(0, maker_ids.size):
                     frame_markers = aruco.drawAxis(frame_markers, mtx, dist, rvec[i], tvec[i], 0.3)
@@ -66,8 +70,6 @@ def main():
             aruco_detected_pub.publish(marcador)
             output_image = bridge.cv2_to_imgmsg(frame_markers, encoding = 'rgb8') #passthrough	
             image_process_pub.publish(output_image)
-
-
 
 if __name__ == '__main__':
     try:

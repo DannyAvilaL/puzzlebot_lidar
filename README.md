@@ -5,7 +5,7 @@ This repository is for the puzzlebot robot.
 **Orden para lanzar los nodos en terminales separadas:**
 
 ```
-$ roslaunch puzzlebot_world puzzlebot_my_world.launch
+$ roslaunch bloque navigation_world.launch 
 ```
 
 ```

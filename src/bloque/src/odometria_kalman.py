@@ -12,7 +12,7 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 import numpy as np
 from std_msgs.msg import Float32, Int32
 from std_srvs.srv import Empty, EmptyResponse
-from fiducial_msgs.msg import FiducialTransform, FiducialTransformArray
+from fiducial_msgs.msg import FiducialTransformArray
 import tf_conversions
 #from geometry_msgs.msg import TransformStamped, Twist
 
@@ -21,7 +21,6 @@ rospy.init_node('odometry_publisher')
 
 # ========= PUBLICADORES A TOPICOS =================
 odom_pub = rospy.Publisher("/odom", Odometry, queue_size=50)
-cmdVel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 pJS = rospy.Publisher("/joint_states", JointState, queue_size=10)
 pPose = rospy.Publisher('/pose', PoseStamped, queue_size=10)
 
@@ -43,22 +42,24 @@ x = 0.0
 y = 0.0
 th = 0.0
 t0 = 0
-# vx = 0.1
-# vy = 0.0
-# vth = 0.0
+
 r, l = 0.05, 0.188
 v, w = 0.0, 0.0
+wr = wl = 0.0
+
 current_time = rospy.Time.now()
 last_time = rospy.Time.now()
+
 newT = 0
 rate = rospy.Rate(10)
-wr = wl = 0.0
+
+# ======== ARUCOS =========
 M = {111: [2, -1], 101: [5, -2], 102: [9, 1], 100: [3, 4], 103:[8,-2], 109:[8,2]}
 medicion_ArUco, ArUco_id = Pose2D(), -1
 aruco_id = None
 trans, rot = 0, 0
-
 magnitud,angulo =0,0
+
 # =========== MATRICES DE APOYO ===========
 mu = np.array([x, y, th]).T
 
@@ -70,7 +71,6 @@ sigma = np.array([[0.0, 0.0, 0.0],
 QK = np.array([[0.5, 0.01, 0.01],
       [0.01, 0.5, 0.01],
       [0.01, 0.01, 0.2]])
-
 
 # ========== SERVICIOS  ============
 def callback_ser(req):
@@ -121,8 +121,8 @@ def callback_fiducials(msg):
             y = trans.x * -1
             z = trans.y * -1
             magnitud = np.sqrt(x**2 + y**2)#np.sqrt(trans.x**2 + trans.y**2 + trans.z**2)
-            angulo = rot.y * -1
-            #angulo = np.arctan2(y, x)
+            #angulo = rot.y * -1
+            angulo = np.arctan2(y, x)
             #print("Trans X", trans.x, type(trans.x))
 
             t = TransformStamped()
@@ -157,8 +157,7 @@ def callback_fiducials(msg):
 rospy.Subscriber("/wl", Float32, callback_wl)
 rospy.Subscriber("/wr", Float32, callback_wr)
 rospy.Subscriber('/aruco_detected', Int32, callback_ArUco)
-rospy.Subscriber('/pose_aruco', Pose2D, callback_medicion_ArUco)
-
+#rospy.Subscriber('/pose_aruco', Pose2D, callback_medicion_ArUco)
 rospy.Subscriber('/fiducial_transforms', FiducialTransformArray, callback_fiducials)
 
 
@@ -334,10 +333,6 @@ if __name__ == "__main__":
             pJS.publish(js)
             tb.sendTransform([x,y,0], qRota, cTime, "base_link", "map")
             last_time = current_time
-
-
-            #cmdVel.publish(vel)
-
 
             rate.sleep()
 

@@ -11,7 +11,7 @@ scan = None
 odom = None
 
 WALL_DIST = 0.5
-WALL_FRONT_DIST = 0.8
+WALL_FRONT_DIST = 1
 W_MAX = 1
 V_MAX = 0.1
 
@@ -23,11 +23,12 @@ right_wall = False
 t0 , t = 0,0
 
 # Goal must be in decimals
-goal_list = [(2.0, 3.0), (5.0, -3.0), (9.0, 1.0), (0.0, 0.0)]
+goal_list = [(2.0, 3.0), (5.0, -3.0), (9.0, 1.0), (3.0, 3.0), (0.0, 0.0)]
 
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0
 robot_y = 0.0
+robot_q = 0.0
 
 states  = ["turn_to_goal", "go_to_goal", "select_side", "obstacle_right", "obstacle_left", "get_goal", "stop"]
 
@@ -43,11 +44,14 @@ def scan_callback(msg):
 
 
 def odom_callback(msg):
-	global odom, robot_x, robot_y
+	global odom, robot_x, robot_y, robot_q
 	odom = msg
 	if odom is not None:
 		robot_x = odom.pose.pose.position.x
 		robot_y = odom.pose.pose.position.y
+		q = odom.pose.pose.orientation
+		(roll, pitch, theta) = euler_from_quaternion([q.x, q.y, q.z, q.w])
+		robot_q = theta
 
 def near_obstacle(dist=WALL_DIST):
 	"""
@@ -226,16 +230,12 @@ def turn_to_goal():
 	"""
 	msg = Twist()
 	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
-	orientation_q = odom.pose.pose.orientation
-	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
-	#falta la transformada en quaterinion.
-	angle_error = angle_goal - yaw
+	angle_error = angle_goal - robot_q
 
-	w = angle_error
-	if angle_error >= 0.08:
+	w = angle_error * 0.02
+	if angle_error >= 0.03:
 		w = W_MAX
-	elif angle_error <= -0.08:
+	elif angle_error <= -0.03:
 		w = -W_MAX
 
 	msg.angular.z = w
@@ -259,19 +259,12 @@ def get_robot_angle():
 	angle_error = angle_goal - yaw
 	return angle_error
 
-
-def go2goal():
-
-	pass
-
-
-
 def go_to_goal():
 	"""
 	Makes the robot go forward until an obstacle is found.
 	"""
 	global front_wall
-	kp = 5
+	kp = 0.6
 	kv = 0.1
 	msg = Twist()
 
@@ -281,17 +274,12 @@ def go_to_goal():
 	d = np.sqrt((goal_y-robot_y)**2 + (goal_x - robot_x)**2)
 	print("DISTANCIA", d)
 
-
-	orientation_q = odom.pose.pose.orientation
-	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
-	#falta la transformada en quaterinion.
-	angle_error = (angle_goal - yaw) * kp
+	angle_error = (angle_goal - robot_q) * kp
 	dist_error = (d - dist) * kv
-	#angle_error = tf.transformations.quaternion_from_euler(0, 0, angle_goal).w - orientation_q.w
+	
 	w = angle_error
 	v = dist_error
-	if angle_error >= 0.8:
+	if angle_error >= 0.08:
 		w = W_MAX
 	elif angle_error <= -0.08:
 		w = -W_MAX
@@ -301,8 +289,8 @@ def go_to_goal():
 	elif dist_error <= -V_MAX:
 		v = -V_MAX
 
-	distancia_abanico_izq = get_distance_in_sector(-30, 0)
-	distancia_abanico_der = get_distance_in_sector(0, 30)
+	distancia_abanico_izq = get_distance_in_sector(-30, -5)
+	distancia_abanico_der = get_distance_in_sector(5, 30)
 	print("Distancia abanico izquierdo", distancia_abanico_izq, "Distancia abanico derecho", distancia_abanico_der)
 	if distancia_abanico_izq <= WALL_FRONT_DIST or distancia_abanico_der <= WALL_FRONT_DIST:
 		msg.linear.x = 0
@@ -322,11 +310,11 @@ def go_to_goal():
 	
 
 def follow_right_hand_wall():
-	distance_to_right = get_distance_in_sector(88, 91)
 	alpha = find_wall_direction_der(70, 90)
 	anguloDerechaDeseado = 0
 	distanciaDerechaDeseado = 0.30
 
+	distance_to_right = get_distance_in_sector(88, 91)
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 
 	errorAngulo = anguloDerechaDeseado - alpha
@@ -336,25 +324,27 @@ def follow_right_hand_wall():
 	
 	kp_alpha = 0.9
 	kp_dist = 1
-	if get_distance_in_sector(0, 25) < 1:
-		v = 0.0
-		w = 0.7
+	if get_distance_in_sector(-3, 3) < 1.5:
+		v = 0.05
+		w = 0.3
 	else:
-		v = 0.2
+		v = 0.1
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 	
 		
-	if w > W_MAX:
-		w = W_MAX
-	elif w < -W_MAX:
-		w = -W_MAX
+	limVelocidad = 0.3
+	#saturacion
+	if w > limVelocidad:
+		w = limVelocidad
+	elif w < -limVelocidad:
+		w = -limVelocidad
 					
 	msg = Twist()
 	msg.angular.z = w
 	msg.linear.x = v
 	vel_pub.publish(msg)
 
-	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(10, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
+	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
 		return True
 	else:
 		return False
@@ -432,7 +422,7 @@ def main():
 
 		if scan is not None and odom is not None:
 			try:
-				print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
+				print("Point ({},{})\t Robot ({},{}, {})".format(goal_x, goal_y, robot_x, robot_y, robot_q))
 				
 				if state == "turn_to_goal":
 					print("TURNING TO GOAL")

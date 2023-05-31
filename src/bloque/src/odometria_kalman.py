@@ -8,12 +8,13 @@ import tf
 import tf2_ros
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, Pose2D
+from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, Pose2D, TransformStamped
 import numpy as np
 from std_msgs.msg import Float32, Int32
 from std_srvs.srv import Empty, EmptyResponse
 from fiducial_msgs.msg import FiducialTransform, FiducialTransformArray
-from geometry_msgs.msg import TransformStamped, Twist
+import tf_conversions
+#from geometry_msgs.msg import TransformStamped, Twist
 
 
 rospy.init_node('odometry_publisher')
@@ -26,16 +27,15 @@ pPose = rospy.Publisher('/pose', PoseStamped, queue_size=10)
 
 
 # =========== OBJETOS DE POSICION =============
-odom_broadcaster = tf.TransformBroadcaster()
-tb = tf.TransformBroadcaster()
-ta = tf2_ros.TransformBroadcaster()
+odom_broadcaster = tf.TransformBroadcaster() 
+tb = tf.TransformBroadcaster() # Aruco
 vel = Twist()
 robotLocation = PoseStamped()
 
-tfBuffer = tf2_ros.Buffer(rospy.Time(30))
-transformListener = tf2_ros.TransformListener(tfBuffer)
-
-#aruco = FiducialTransformArray()
+# ========== PARA LOS ARUCOS (TF o TF2) ===========
+ta = tf2_ros.TransformBroadcaster() 
+#tfBuffer = tf2_ros.Buffer(rospy.Time(30))
+#transformListener = tf.TransformListener(tfBuffer) 
 
 # ============ VARIABLES INICIALES ===========
 pathFile = "./data_record.txt"
@@ -55,7 +55,10 @@ rate = rospy.Rate(10)
 wr = wl = 0.0
 M = {111: [2, -1], 101: [5, -2], 102: [9, 1], 100: [3, 4], 103:[8,-2], 109:[8,2]}
 medicion_ArUco, ArUco_id = Pose2D(), -1
+aruco_id = None
+trans, rot = 0, 0
 
+magnitud,angulo =0,0
 # =========== MATRICES DE APOYO ===========
 mu = np.array([x, y, th]).T
 
@@ -99,36 +102,56 @@ def callback_medicion_ArUco(msg):
     medicion_ArUco.theta = msg.theta
 
 def callback_fiducials(msg):
+    global aruco_id, trans, rot, magnitud, angulo
     image_time = msg.header.stamp
     found = False
     
+    if len(msg.transforms) == 0:
+        aruco_id = -1
+        return
     #por cada aruco, se publica su transformada
     for aruco in msg.transforms:
-        id = aruco.fiducial_id
-        trans = aruco.transform.translation
-        rot = aruco.transform.rotation
+        # if the aruco is of interest
+        if aruco.fiducial_id in M.keys():
+            print("SI EXISTE EL ARUCO\n\n")
+            aruco_id = aruco.fiducial_id
+            trans = aruco.transform.translation
+            rot = aruco.transform.rotation
+            x = trans.z
+            y = trans.x * -1
+            z = trans.y * -1
+            magnitud = np.sqrt(x**2 + y**2)#np.sqrt(trans.x**2 + trans.y**2 + trans.z**2)
+            angulo = rot.y * -1
+            #angulo = np.arctan2(y, x)
+            #print("Trans X", trans.x, type(trans.x))
 
-        t = TransformStamped()
-        t.child_frame_id = "f_id_" + str(id)
-        t.header.frame_id = msg.header.frame_id
-        t.header.stamp = image_time
-        t.transform.translation.x = trans.x
-        t.transform.translation.y = trans.y
-        t.transform.translation.z = trans.z
-        t.transform.rotation.x = rot.x
-        t.transform.rotation.y = rot.y
-        t.transform.rotation.z = rot.z
+            t = TransformStamped()
+            t.header.frame_id = msg.header.frame_id  # msg.header.frame_id  to base_link
+            t.child_frame_id = "f_id_" + str(id) # camara 
+            t.header.stamp = image_time
+            t.transform.translation.x = x
+            t.transform.translation.y = y
+            t.transform.translation.z = z
+            #q = tf_conversions.transformations.quaternion_from_euler(rot.x, rot.y, rot.z)
+            t.transform.rotation.x = rot.x
+            t.transform.rotation.y = rot.y
+            t.transform.rotation.z = rot.z
+            t.transform.rotation.w = rot.w
+            ta.sendTransform(t) 
 
+            #aruco_q = tf.transformations.quaternion_from_euler(rot.x, rot.y, rot.z)
+            #tr = tfBuffer.lookup_transform("base_link", t.child_frame_id, image_time) # tf2
+            #ct = tr.transform.translation
+            #cr = tr.transform.rotation
+
+            #print("T_fidBase %lf %lf %lf %lf %lf %lf %lf\n" % \
+            #                     (ct.x, ct.y, ct.z, cr.x, cr.y, cr.z, cr.w))
+        else:
+            print("NO EXISTE EL ARUCO\n\n")
+            magnitud, angulo = 0,0
+            aruco_id = -1
         return 
-        aruco_q = tf.transformations.quaternion_from_euler(rot.x, rot.y, rot.z)
-        ta.sendTransform(t)
 
-        tr = tfBuffer.lookup_transform("base_link", t.child_frame_id, image_time)
-        ct = tr.transform.translation
-        cr = tr.transform.rotation
-
-        print("T_fidBase %lf %lf %lf %lf %lf %lf %lf\n" % \
-                             (ct.x, ct.y, ct.z, cr.x, cr.y, cr.z, cr.w))
 
 
 rospy.Subscriber("/wl", Float32, callback_wl)
@@ -140,7 +163,7 @@ rospy.Subscriber('/fiducial_transforms', FiducialTransformArray, callback_fiduci
 
 
 def EKF(Muk_ant, sigmak_ant, Zik, Rk):
-    global ArUco_id
+    global ArUco_id, aruco_id
     '''
     Inputs
         -Muk_ant: vector mu obtenido
@@ -155,13 +178,13 @@ def EKF(Muk_ant, sigmak_ant, Zik, Rk):
     Muk = Muk_ant 
     sigmak = sigmak_ant
 
-    if (ArUco_id != -1):###############si ve aruco, mi - coordenada
-    #if aruco. fiducial_id in M.keys():
-        delta_x = M[ArUco_id][0] - Muk[0]
-        delta_y = M[ArUco_id][1] - Muk[1]
+    #if (aruco_id != None):###############si ve aruco, mi - coordenada
+    if aruco_id in M.keys():
+        delta_x = M[aruco_id][0] - Muk[0]
+        delta_y = M[aruco_id][1] - Muk[1]
         p = delta_x**2 + delta_y**2
         Gk = np.array([[-delta_x/(p**0.5), -delta_y/(p**0.5), 0],
-              [delta_y/p,        -delta_x/p,     -1]])
+                       [delta_y/p,         -delta_x/p,       -1]])
         
         Zik_e = np.array([p**0.5,
                  np.arctan2(delta_y, delta_x) - Muk[2]]) 
@@ -171,7 +194,11 @@ def EKF(Muk_ant, sigmak_ant, Zik, Rk):
         Kk = np.dot(sigmak, np.dot(Gk.T, np.linalg.inv(Zk)))
         #resta en ecuacion de Manchester: Zik - Zik_e
         Muk += np.dot(Kk, (Zik - Zik_e))
-        print("Diferencias Zk y Zke", Zik - Zik_e)
+        #print("Diferencias Zk y Zke", Zik - Zik_e, Zik)
+        print("Diferencias Zk y Zke----------------------------")
+        print('zik: ',  Zik)
+        print('zik_e: ',  Zik_e)
+        print('diferencia: ', (Zik - Zik_e))
 
         I = np.eye(3) 
         sigmak = np.dot((I - np.dot(Kk, Gk)), sigmak)
@@ -196,14 +223,14 @@ def calculoQK():
 def propagacionError(dt, v, th):
     global sigma
     #Jacobiano
-    H = np.array([  [1.0, 0.0, -dt * v * np.sin(mu[2])],
-                    [0.0, 1.0, dt * v * np.cos(mu[2])],
+    H = np.array([  [1.0, 0.0, -dt * v * np.sin(th)],
+                    [0.0, 1.0, dt * v * np.cos(th)],
                     [0.0, 0.0, 1.0]])
     
     HT = H.transpose()
     calculoQK()
     sigma = np.dot(np.dot(H,sigma),HT) + QK
-    #sigma = (H * sigma * HT) + QK
+    
 
 last_time = rospy.Time.now()
 # ============ FLUJO PRINCIPAL ============
@@ -226,6 +253,7 @@ if __name__ == "__main__":
             y += dt * v * np.sin(th)
             th += (dt * w)
 
+            
             if th >= np.pi:
                 th = -pi
                 mu[2] = -pi
@@ -237,7 +265,7 @@ if __name__ == "__main__":
             # wl = (v - 0.5*l*w)/r
             # wr = (v + 0.5*l*w)/r
             # cov = sigma.flatten().tolist()
-            Zik = [medicion_ArUco.x, medicion_ArUco.theta] 
+            Zik = [magnitud, angulo] 
             #Zik = tf.lookupTransform()
             error = 0.1
             Rk = np.eye((2)) * error
@@ -258,7 +286,7 @@ if __name__ == "__main__":
             )
 
 
-            propagacionError(dt, v, th)
+            propagacionError(dt, v, mu[2])
 
             odom = Odometry()
             odom.header.stamp = current_time

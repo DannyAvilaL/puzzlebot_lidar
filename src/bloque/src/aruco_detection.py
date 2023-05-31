@@ -11,8 +11,8 @@ import tf
 
 bridge = CvBridge()
 cv_image = None
-dict_aruco = aruco.Dictionary_get(aruco.DICT_4X4_50)
-lista_arucos =[0, 1, 3, 4, 5, 6]
+dict_aruco = aruco.Dictionary_get(aruco.DICT_7X7_100)
+#lista_arucos =[0, 1, 3, 4, 5, 6]
 
 parameters = aruco.DetectorParameters_create()
 parameters.adaptiveThreshWinSizeMin = 3
@@ -50,7 +50,7 @@ def main():
         rate.sleep()
         if cv_image is not None:
             frame_markers, maker_corners, maker_ids = aruco_identify(cv_image)
-            if np.all(maker_ids != None) and maker_ids[0][0] in lista_arucos:
+            if np.all(maker_ids != None):
                 marcador = maker_ids[0][0]
                 rvec, tvec,_ = aruco.estimatePoseSingleMarkers(maker_corners, 0.33, mtx, dist)
                 #rvec, tvec,_ = cv2.solvePnP(marker_points, maker_corners, mtx, dist, False, cv2.SOLVEPNP_IPPE_SQUARE)

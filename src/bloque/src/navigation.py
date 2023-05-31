@@ -13,7 +13,7 @@ odom = None
 WALL_DIST = 0.5
 WALL_FRONT_DIST = 0.8
 W_MAX = 1
-V_MAX = 0.3
+V_MAX = 0.1
 
 w = 0
 v = 0.1
@@ -23,7 +23,7 @@ right_wall = False
 t0 , t = 0,0
 
 # Goal must be in decimals
-goal_list = [(2.0, 3.0), (8.0, 2.0), (3.0, 1.0), (0.0, 0.0)]
+goal_list = [(2.0, 3.0), (5.0, -3.0), (9.0, 1.0), (0.0, 0.0)]
 
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0
@@ -44,10 +44,10 @@ def scan_callback(msg):
 
 def odom_callback(msg):
 	global odom, robot_x, robot_y
+	odom = msg
 	if odom is not None:
 		robot_x = odom.pose.pose.position.x
 		robot_y = odom.pose.pose.position.y
-	odom = msg
 
 def near_obstacle(dist=WALL_DIST):
 	"""
@@ -216,6 +216,8 @@ def side_check():
 		return "left"
 	else:
 		return "right"
+	
+
 ### FUNCIONES DE ESTADOS
 def turn_to_goal():
 	"""
@@ -231,9 +233,9 @@ def turn_to_goal():
 	angle_error = angle_goal - yaw
 
 	w = angle_error
-	if angle_error >= 0.3:
+	if angle_error >= 0.08:
 		w = W_MAX
-	elif angle_error <= -0.3:
+	elif angle_error <= -0.08:
 		w = -W_MAX
 
 	msg.angular.z = w
@@ -246,6 +248,7 @@ def turn_to_goal():
 	else:
 		return False
 
+
 def get_robot_angle():
 	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
 
@@ -256,12 +259,19 @@ def get_robot_angle():
 	angle_error = angle_goal - yaw
 	return angle_error
 
+
+def go2goal():
+
+	pass
+
+
+
 def go_to_goal():
 	"""
 	Makes the robot go forward until an obstacle is found.
 	"""
 	global front_wall
-	kp = 0.5
+	kp = 5
 	kv = 0.1
 	msg = Twist()
 
@@ -270,6 +280,8 @@ def go_to_goal():
 	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
 	d = np.sqrt((goal_y-robot_y)**2 + (goal_x - robot_x)**2)
 	print("DISTANCIA", d)
+
+
 	orientation_q = odom.pose.pose.orientation
 	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
 	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
@@ -279,9 +291,9 @@ def go_to_goal():
 	#angle_error = tf.transformations.quaternion_from_euler(0, 0, angle_goal).w - orientation_q.w
 	w = angle_error
 	v = dist_error
-	if angle_error >= 0.3:
+	if angle_error >= 0.8:
 		w = W_MAX
-	elif angle_error <= -0.3:
+	elif angle_error <= -0.08:
 		w = -W_MAX
 
 	if dist_error >= V_MAX:
@@ -289,8 +301,8 @@ def go_to_goal():
 	elif dist_error <= -V_MAX:
 		v = -V_MAX
 
-	distancia_abanico_izq = get_distance_in_sector(-10, 0)
-	distancia_abanico_der = get_distance_in_sector(0, 10)
+	distancia_abanico_izq = get_distance_in_sector(-30, 0)
+	distancia_abanico_der = get_distance_in_sector(0, 30)
 	print("Distancia abanico izquierdo", distancia_abanico_izq, "Distancia abanico derecho", distancia_abanico_der)
 	if distancia_abanico_izq <= WALL_FRONT_DIST or distancia_abanico_der <= WALL_FRONT_DIST:
 		msg.linear.x = 0
@@ -310,7 +322,6 @@ def go_to_goal():
 	
 
 def follow_right_hand_wall():
-	print('--------------------SIGUIENDO MURO-----------------')
 	distance_to_right = get_distance_in_sector(88, 91)
 	alpha = find_wall_direction_der(70, 90)
 	anguloDerechaDeseado = 0
@@ -325,7 +336,7 @@ def follow_right_hand_wall():
 	
 	kp_alpha = 0.9
 	kp_dist = 1
-	if get_distance_in_sector(0, 3) < 1:
+	if get_distance_in_sector(0, 25) < 1:
 		v = 0.0
 		w = 0.7
 	else:
@@ -343,7 +354,7 @@ def follow_right_hand_wall():
 	msg.linear.x = v
 	vel_pub.publish(msg)
 
-	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= (scan.range_min+scan.range_max)/2 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
+	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(10, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
 		return True
 	else:
 		return False
@@ -444,12 +455,12 @@ def main():
 						state = "obstacle_right"
 					t0 = rospy.Time.now().to_sec()
 				elif state == "obstacle_right":
-					#print("Obstacle at right")
+					print("Obstacle at right")
 					status = follow_right_hand_wall()
 					if status:
 						state = "go_to_goal"
 				elif state == "obstacle_left":
-					#print("Obstacle at left")
+					print("Obstacle at left")
 					status = follow_left_hand()
 					if status:
 						state = "go_to_goal"
@@ -472,12 +483,12 @@ def main():
 				msg.linear.x = 0.0
 				msg.linear.y = 0.0
 				vel_pub.publish(msg)
-				print("Restarting points")
-				puntos = get_new_goal()
+				#print("Restarting points")
+				#puntos = get_new_goal()
 				# getting a new goal
-				print("Arrived to goal")
-				print("Getting new goal")
-				goal_x, goal_y =  next(puntos)
+				#print("Arrived to goal")
+				#print("Getting new goal")
+				#goal_x, goal_y =  next(puntos)
 				
 
 		rate.sleep()

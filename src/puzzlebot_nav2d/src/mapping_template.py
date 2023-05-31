@@ -66,6 +66,8 @@ class Mapper:
     def scan_callback(self, msg):
         """Called when a new scan is available from the lidar. """
         self.scan = msg
+        if self.scan is not None:
+            self.scan.ranges = np.array(map(lambda x: x if x != np.inf else self.scan.range_max, self.scan.ranges)) 
 
     def odom_callback(self, msg):
         """Called when a new odometry message is available. """
@@ -73,7 +75,7 @@ class Mapper:
 
     def mapit(self):
         while not rospy.is_shutdown():
-
+            #print(self.scan)
             if self.scan is not None and self.odom is not None:
                 #--------------------------------------------------------------
                 # Your code here
@@ -91,7 +93,7 @@ class Mapper:
                 # 3) Set pixels along the ray to 0 (free).
                 #--------------------------------------------------------------
                 #--------------------------------------------------------------
-
+                print("CORRIENDO MAPA")
                 orig_m, xy_m = scan_to_map_coordinates(self.scan, self.odom, self.map.info.origin)
 
                 for xy_ in xy_m:

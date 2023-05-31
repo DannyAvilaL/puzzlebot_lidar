@@ -127,7 +127,7 @@ class OdometryPublisher():
                     # Get the initial pose 
                     t = TransformStamped()
                     t.header.stamp = rospy.Time.now()
-                    t.header.frame_id = "world"
+                    t.header.frame_id = "map"
                     t.child_frame_id = "odom_true"
                     t.transform.translation = self.model_state.position
                     t.transform.rotation = self.model_state.orientation

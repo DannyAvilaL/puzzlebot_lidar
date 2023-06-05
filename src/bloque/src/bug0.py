@@ -21,7 +21,7 @@ right_wall = False
 
 r, l = 0.05, 0.188
 
-goal_x, goal_y = (2.0, 5.0) # El punto debe estar en decimales  (4.0,4.0)
+goal_x, goal_y = (-1.0, 3.0) # El punto debe estar en decimales  (4.0,4.0)
 # (-1.0,3.0)
 robot_x = 0.0
 robot_y = 0.0

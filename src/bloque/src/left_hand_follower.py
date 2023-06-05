@@ -90,15 +90,15 @@ class RightHandRuleController:
                 #print( self.scan.ranges[360])
                 if get_distance_in_sector(self.scan, -3, 3) < 1.5:
                     print("FRENTE PARED ===")
-                    v = 0.3
-                    w = -0.5
+                    v = 0.05
+                    w = -0.1
                 else:
                     #pass
-                    v = 0.4
+                    v = 0.1
                     w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
                 #w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 
-                limVelocidad = 1.5
+                limVelocidad = 0.25
                 #saturacion
                 if w > limVelocidad:
                     w = limVelocidad
@@ -142,6 +142,7 @@ def find_wall_direction(scan):
                        hip*np.sin(np.deg2rad(90)))
     #print(hip, ady, alpha, "FIND WALL")
     return alpha
+
 
     
 def get_distance_in_sector(scan, start_angle, end_angle) :

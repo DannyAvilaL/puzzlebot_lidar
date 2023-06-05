@@ -1,4 +1,4 @@
-material aruco_tag_1
+material aruco_tag_5
 {
   technique
   {
@@ -6,7 +6,7 @@ material aruco_tag_1
     {  
       texture_unit
       {
-        texture 101.png
+        texture 103.png
         scale 1 1
       }
     }

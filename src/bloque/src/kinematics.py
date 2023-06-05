@@ -187,7 +187,7 @@ if __name__ == "__main__":
             tb.sendTransform([x,y,0], qRota, cTime, "base_link", "world")
            
             js = JointState()
-            js.name = ["right_wheel_joint", "left_wheel_joint"]
+            js.name = ["base_to_right_w", "base_to_left_w"]
             js.position = [wr*t, wl*t]
             js.header.stamp = cTime
             pJS.publish(js)

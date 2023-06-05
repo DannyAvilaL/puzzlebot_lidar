@@ -11,22 +11,26 @@ scan = None
 odom = None
 
 WALL_DIST = 0.5
-W_MAX = 0.4
-V_MAX = 0.3
-R, L = 0.05, 0.188
+WALL_FRONT_DIST = 1
+W_MAX = 1
+V_MAX = 0.1
 
 w = 0
 v = 0.1
 
 front_wall = False
 right_wall = False
+t0 , t = 0,0
 
 # Goal must be in decimals
-goal_list = [(-2.0, 3.0), (-1.0, 8.0), (1.0, 3.0), (0.0, 0.0)]
+goal_list = [(2.0, 3.0), (5.0, -3.0), (9.0, 1.0), (3.0, 3.0), (0.0, 0.0)]
 
 goal_x, goal_y = (-2.0, 4.0) 
 robot_x = 0.0
 robot_y = 0.0
+robot_q = 0.0
+
+states  = ["turn_to_goal", "go_to_goal", "select_side", "obstacle_right", "obstacle_left", "get_goal", "stop"]
 
 def get_new_goal():
 	for i in goal_list:
@@ -40,34 +44,14 @@ def scan_callback(msg):
 
 
 def odom_callback(msg):
-	global odom, robot_x, robot_y
+	global odom, robot_x, robot_y, robot_q
+	odom = msg
 	if odom is not None:
 		robot_x = odom.pose.pose.position.x
 		robot_y = odom.pose.pose.position.y
-	odom = msg
-
-
-def turn_to_goal():
-	"""
-	Function that rotates the robot towards the goal
-	Returns True unless is heading towards goal
-	"""
-	msg = Twist()
-
-	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
-
-	orientation_q = odom.pose.pose.orientation
-	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
-	#falta la transformada en quaterinion.
-	angle_error = angle_goal - yaw
-	if abs(round(angle_error, 3)) <= 0.1:
-		return angle_error, True
-	else:
-		return angle_error, False
-
-
-	
+		q = odom.pose.pose.orientation
+		(roll, pitch, theta) = euler_from_quaternion([q.x, q.y, q.z, q.w])
+		robot_q = theta
 
 def near_obstacle(dist=WALL_DIST):
 	"""
@@ -122,44 +106,6 @@ def calculate_line_difference(threshold=0.5):
 	return False
 
 
-def go_to_wall():
-	"""
-	Function that makes the robot go forward until
-	an obstacle is found.
-	"""
-	global front_wall
-	print('--------------------BUSCANDO MURO ENFRENTE-----------------')
-	msg = Twist()
-	msg.linear.x = 0.1
-	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
-	orientation_q = odom.pose.pose.orientation
-	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
-	#falta la transformada en quaterinion.
-	angle_error = angle_goal - yaw
-
-	if abs(angle_error) >= 35:
-		msg.linear.x = 0
-
-	if angle_error >= W_MAX:
-		angle_error = W_MAX
-	elif angle_error <= -W_MAX:
-		angle_error = -W_MAX
-
-	msg.angular.z = angle_error
-	vel_pub.publish(msg)
-
-	if get_distance_in_sector(-15, 15) < WALL_DIST:
-		#print('muro enfrente')
-		msg.linear.x = 0
-		msg.linear.y = 0
-		msg.angular.z = 0.2
-		vel_pub.publish(msg)
-		return True
-	else:		
-		return False
-
-
 def range_index(angle):
 	"""
 	Function that returns the index of the angle
@@ -179,6 +125,9 @@ def range_index(angle):
 		return 0
 	
 	grados = np.linspace(max_angle, min_angle, size)
+	#dist = np.sqrt((grados-angle)**2)
+	#index = np.argmin(dist)
+	#index = np.argmin()
 	index = (np.abs(grados-angle)).argmin()
 	return index
 
@@ -198,15 +147,16 @@ def get_distance_in_sector(start_angle, end_angle):
 	start_index = range_index(start_angle)
 	end_index = range_index(end_angle)
 	sector_ranges = scan.ranges[end_index:start_index]
+	#print(start_index, end_index)
 	return np.mean(sector_ranges)
 
 
-def find_wall_direction(hip, lat, dir):
+def find_wall_directionunused(hip, lat, dir):
 	"""
 	Asume que hay una pared en la derecha
 	"""
-	hip = get_distance_in_sector(hip - 2, hip)
-	ady = get_distance_in_sector(lat - 2, lat)
+	hip = get_distance_in_sector(hip - 1, hip)
+	ady = get_distance_in_sector(lat - 1, lat)
 	if dir == "left":
 		alpha = np.arctan2(hip*np.cos(np.deg2rad(abs(hip)))-ady,
 		    		   hip*np.sin(np.deg2rad(abs(lat)))) 
@@ -215,6 +165,47 @@ def find_wall_direction(hip, lat, dir):
 		    		   	hip*np.cos(np.deg2rad(abs(hip)))) 
 	return alpha
 
+
+def find_wall_direction_der(hipotenusa, adyacente):
+	"""
+	Asume que hay una pared en la derecha
+	"""
+	hip = get_distance_in_sector(hipotenusa - 1, hipotenusa)
+	ady = get_distance_in_sector(adyacente - 1, adyacente)
+
+	alpha = np.arctan2(hip*np.sin(np.deg2rad(hipotenusa))-ady, 
+		    hip*np.cos(np.deg2rad(hipotenusa))) ########################3
+
+	#print('hip: ' + str(hip) + ' ady: ' + str(ady) + ' alpha: ' + str(alpha))
+
+	return alpha
+
+
+def find_wall_direction_ziq():
+    """Assuming wall is on the right, finds the direction of the wall w.r.t
+    the robot frame (x ahead, y to the left). The direction is returned
+    as an angle, which is 0 if the wall is parallel to the heading of the
+    robot and negative if the robot is heading away from the wall.
+
+    Tests
+    -----
+    >>> scan = generate_test_scan(straight_wall=True)
+    >>> wall_dir = find_wall_direction(scan)
+    >>> np.abs(wall_dir) < 1e-6
+    True
+    """
+
+    #hip = get_distance_in_sector(scan, np.radians(45-1), np.radians(45))
+    #ady = get_distance_in_sector(scan, np.radians(90-1), np.radians(90))
+
+    hip = get_distance_in_sector(-46, -44)
+    ady = get_distance_in_sector(-90, -86)
+
+
+    alpha = np.arctan2(hip * np.cos(np.deg2rad(45))-ady, 
+                       hip*np.sin(np.deg2rad(90)))
+    #print(hip, ady, alpha, "FIND WALL")
+    return alpha
 
 def side_check():
 	"""
@@ -229,72 +220,177 @@ def side_check():
 		return "left"
 	else:
 		return "right"
+	
 
+### FUNCIONES DE ESTADOS
+def turn_to_goal():
+	"""
+	Function that rotates the robot towards the goal
+	within the same (x,y) position
+	"""
+	msg = Twist()
+	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
+	angle_error = angle_goal - robot_q
+
+	w = angle_error * 0.02
+	if angle_error >= 0.03:
+		w = W_MAX
+	elif angle_error <= -0.03:
+		w = -W_MAX
+
+	msg.angular.z = w
+	vel_pub.publish(msg)
+	# deleting the message
+	del msg
+	# check if the robot is heading towards goal
+	if abs(round(angle_error, 3)) <= 0.1:
+		return True
+	else:
+		return False
+
+
+def get_robot_angle():
+	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
+
+	orientation_q = odom.pose.pose.orientation
+	orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+	(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
+	#falta la transformada en quaterinion.
+	angle_error = angle_goal - yaw
+	return angle_error
+
+def go_to_goal():
+	"""
+	Makes the robot go forward until an obstacle is found.
+	"""
+	global front_wall
+	kp = 0.6
+	kv = 0.1
+	msg = Twist()
+
+	dist = 0.05
+
+	angle_goal = np.arctan2(goal_y - robot_y, goal_x - robot_x)
+	d = np.sqrt((goal_y-robot_y)**2 + (goal_x - robot_x)**2)
+	print("DISTANCIA", d)
+
+	angle_error = (angle_goal - robot_q) * kp
+	dist_error = (d - dist) * kv
+	
+	w = angle_error
+	v = dist_error
+	if angle_error >= 0.08:
+		w = W_MAX
+	elif angle_error <= -0.08:
+		w = -W_MAX
+
+	if dist_error >= V_MAX:
+		v = V_MAX
+	elif dist_error <= -V_MAX:
+		v = -V_MAX
+
+	distancia_abanico_izq = get_distance_in_sector(-30, -5)
+	distancia_abanico_der = get_distance_in_sector(5, 30)
+	print("Distancia abanico izquierdo", distancia_abanico_izq, "Distancia abanico derecho", distancia_abanico_der)
+	if distancia_abanico_izq <= WALL_FRONT_DIST or distancia_abanico_der <= WALL_FRONT_DIST:
+		msg.linear.x = 0
+		msg.linear.y = 0
+		msg.angular.z = 0
+		vel_pub.publish(msg)
+		del msg
+		return "obstacle"
+	elif dist_error <= dist:
+		return "arrived"
+	else:		
+		msg.linear.x = v
+		msg.angular.z = w
+		vel_pub.publish(msg)
+		del msg
+		return "forward"
+	
 
 def follow_right_hand_wall():
-	#print('FOLLOWING FROM RIGHT')
-	kp_alpha = 2
-	kp_dist = 1
-	distance_to_right = get_distance_in_sector(88, 91)
-	alpha = find_wall_direction(70, 90, "right")
+	alpha = find_wall_direction_der(70, 90)
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = 0.1
+	distanciaDerechaDeseado = 0.30
 
+	distance_to_right = get_distance_in_sector(88, 91)
 	distanciaDerecha = distance_to_right * np.cos(alpha)
 
 	errorAngulo = anguloDerechaDeseado - alpha
 	errorDistancia = distanciaDerechaDeseado - distanciaDerecha 
-	#print("ERROR DISTANCIA", errorDistancia)
-	if get_distance_in_sector(-5, 5) < WALL_DIST:
-		print("WALL AT THE FRONT")
-		v = 0
-		w = 0.5
-	else:
+
+	print('alpha: ' + str(alpha) + ' distanciaDerecha: ' + str(distanciaDerecha) + ' error angulo: ' + str(errorAngulo) + ' error distancia: ' + str(errorDistancia))
+	
+	kp_alpha = 0.9
+	kp_dist = 1
+	if get_distance_in_sector(-3, 3) < 1.5:
 		v = 0.05
+		w = 0.3
+	else:
+		v = 0.1
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 	
-	if w >= W_MAX:
-		w = W_MAX
-	elif w <= -W_MAX:
-		w = -W_MAX
+		
+	limVelocidad = 0.3
+	#saturacion
+	if w > limVelocidad:
+		w = limVelocidad
+	elif w < -limVelocidad:
+		w = -limVelocidad
 					
 	msg = Twist()
 	msg.angular.z = w
 	msg.linear.x = v
 	vel_pub.publish(msg)
 
+	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
+		return True
+	else:
+		return False
 
 def follow_left_hand():
-	kp_alpha = 3
-	kp_dist = 2
+	global t
+	kp_alpha = 2
+	kp_dist = 3
 
+	distance_to_right = get_distance_in_sector(- 90, -86)
+                                                           
+	#--------------------------------------------------------------
+	#--------------------------------------------------------------
+	alpha = find_wall_direction_ziq()
 	anguloDerechaDeseado = 0
-	distanciaDerechaDeseado = -0.1
-
-	alpha = find_wall_direction(-45, -90, "left")
-
-	distance_to_right = get_distance_in_sector(-90, -86)
-	#print("DISTANCE", distance_to_right, np.cos(alpha))
+	distanciaDerechaDeseado = -0.3
+	#distanciaFrontalMaxima = 1
+	
+	#print("DISTANCIA A LA IZQUIERDA: ", distance_to_right)
 	distanciaDerecha = distance_to_right * np.cos(alpha)
+
 	errorAngulo = anguloDerechaDeseado + alpha
 	errorDistancia = distanciaDerechaDeseado + distanciaDerecha
-	#print("ERROR DISTANCIA", errorDistancia)
 
-	if get_distance_in_sector(-5, 5) < WALL_DIST:
-		print("WALL AT THE FRONT")
-		v = 0
-		w = -0.5
-	else:
+	print("Angulo", alpha, "Error angulo", errorAngulo)
+	print("DistanciaActual", distanciaDerecha, "Error distancia", errorDistancia)
+
+	kp_alpha = 3
+	kp_dist = 2
+	#print( self.scan.ranges[360])
+	if get_distance_in_sector(-3, 3) < 1.5:
+		print("FRENTE PARED ===")
 		v = 0.05
+		w = -0.3
+	else:
+		#pass
+		v = 0.1
 		w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
-		#print(kp_alpha, errorAngulo, kp_dist, errorDistancia)
-		#print("====")
+	#w = (kp_alpha * errorAngulo) + (kp_dist * errorDistancia)
 
+	limVelocidad = 0.3
 	#saturacion
-	if w >= W_MAX:
-		w = W_MAX
-	elif w <= -W_MAX:
-		w = -W_MAX
+	if w > limVelocidad:
+		w = limVelocidad
+	elif w < -limVelocidad:
+		w = -limVelocidad
 	
 	#rospy.loginfo("{} {} {}".format(errorAngulo, errorDistancia, w))
 					
@@ -304,95 +400,98 @@ def follow_left_hand():
 	#print(msg)
 	vel_pub.publish(msg)
 
+	if abs(get_robot_angle()) <= np.deg2rad(2) and get_distance_in_sector(-30, 30) >= 1 or ((goal_x - robot_x) <= 0.05 and (goal_y - robot_y) <= 0.05):
+		return True
+	else:
+		return False
+
 
 def main():
-	global right_wall, front_wall, goal_y, goal_x
-	msg = Twist()
+	global right_wall, front_wall, goal_y, goal_x, t0
 	# se calcula la pendiente
 	m = calculate_m()
 	print("Slope: ", m)
-	lado_seleccionado = False
-	obstacle_found = False
-	towards_goal = False
-	follow_wall= False
-	iteraciones = 0
 	puntos = get_new_goal()
-	try:
-		goal_x, goal_y = next(puntos)
-		while not rospy.is_shutdown():
-			msg = Twist()
-			if scan is not None and odom is not None:
-				print("Point ({},{})\t Robot ({},{})".format(goal_x, goal_y, robot_x, robot_y))
-				# MIENTRAS LA POS DEL ROBOT NO ESTE DEMASIADO CERCA DEL PUNTO P
-				robot_angle = turn_to_goal()
-				if (round(abs(goal_y - robot_y), 3) >= 0.1 or round(abs(goal_x - robot_x), 3) >= 0.1):
-					if obstacle_found and follow_wall:
-						#print("obstacle_found", obstacle_found, "angulo", robot_angle)	
-						if not lado_seleccionado:
-							print("SELECCIONADO LADO")
-							lado_seleccionado = side_check()
-							t0 = rospy.Time.now().to_sec()	
-							follow_wall = True
-						else:
-							if lado_seleccionado == "right" and follow_wall:
-								#print("RIGHT HAND", robot_angle[0])
-								#follow_left_hand()
-								follow_right_hand_wall()
-								angle_error, _ = robot_angle
-							elif lado_seleccionado == "left" and follow_wall:
-								#print("LEFT HAND", robot_angle[0])
-								#follow_right_hand_wall()
-								follow_left_hand()
-								
-								angle_error, _ = robot_angle
+	side = None
+	
+	state = states[0]
+	
+	goal_x, goal_y = next(puntos)
+	print(goal_x, goal_y)
+	while not rospy.is_shutdown():
 
-							#print("ERROR DE ANGULO", angle_error)
-							tiempo = rospy.Time.now().to_sec() - t0
+		if scan is not None and odom is not None:
+			try:
+				print("Point ({},{})\t Robot ({},{}, {})".format(goal_x, goal_y, robot_x, robot_y, robot_q))
+				
+				if state == "turn_to_goal":
+					print("TURNING TO GOAL")
+					status = turn_to_goal()
+					if status:
+						state = "go_to_goal"
+				elif state == "go_to_goal":
+					print("GOING TO GOAL")
+					status = go_to_goal()
+					if status == "obstacle":
+						state = "select_side"
+					elif status == "arrived":
+						state = "get_goal"
+				elif state == "select_side":
+					side = side_check()
+					if side == "left":
+						state = "obstacle_left"
+						#state = states[4]
+					elif side == "right":
+						state = "obstacle_right"
+					t0 = rospy.Time.now().to_sec()
+				elif state == "obstacle_right":
+					print("Obstacle at right")
+					status = follow_right_hand_wall()
+					if status:
+						state = "go_to_goal"
+				elif state == "obstacle_left":
+					print("Obstacle at left")
+					status = follow_left_hand()
+					if status:
+						state = "go_to_goal"
+				elif state == "get_goal":
+					goal_x, goal_y = next(puntos)
+					m = calculate_m()
+					print("New Slope: ", m)
+					state = "turn_to_goal"
+				elif state == "stop":
+					msg = Twist()
+					msg.angular.z = 0.0
+					msg.linear.x = 0.0
+					msg.linear.y = 0.0
+					vel_pub.publish(msg)
+					rospy.loginfo("Stopping robot")
+			except StopIteration:
+				print("Completed map points")
+				msg = Twist()
+				msg.angular.z = 0.0
+				msg.linear.x = 0.0
+				msg.linear.y = 0.0
+				vel_pub.publish(msg)
+				#print("Restarting points")
+				#puntos = get_new_goal()
+				# getting a new goal
+				#print("Arrived to goal")
+				#print("Getting new goal")
+				#goal_x, goal_y =  next(puntos)
+				
 
-							# si esta apuntando al mismo lado del goal
-							print(abs(angle_error) <= 0.2, tiempo > 3)
-							if abs(angle_error) <= 0.2 and tiempo > 3: 
-								print("VIENDO A GOAL, SALIENDO DE FOLLOW")
-								if (lado_seleccionado == "right" and get_distance_in_sector(-30, 0) >= 1.5) or \
-									(lado_seleccionado == "left" and get_distance_in_sector(0, 30) >= 1.5):
-									follow_wall = False
-
-					else:
-						obstacle_found = go_to_wall()
-
-						if obstacle_found or near_obstacle():
-							iteraciones = 0
-							follow_wall = True
-						#		pass
-					
-				else:
-					print("Arrived to goal")
-					#msg.angular.z = 0.1
-					#msg.linear.x = 0.0
-					#msg.linear.y = 0.0
-					
-					#vel_pub.publish(msg)
-					print("Getting new goal")
-					goal_x, goal_y =  next(puntos)
-
-			#rate.sleep()
-	except StopIteration:
-		print("Completed map points")
-		msg.angular.z = 0.0
-		msg.linear.x = 0.0
-		msg.linear.y = 0.0
-		vel_pub.publish(msg)
-		print("Restarting points")
-		puntos = get_new_goal()
+		rate.sleep()
+	
 
 
 if __name__ == '__main__':
 	try:
-		rospy.init_node('bug2_node')
+		rospy.init_node('navigation_node')
 		scan_listener = rospy.Subscriber('/scan', LaserScan, scan_callback)
 		odom_listener = rospy.Subscriber('/odom',  Odometry, odom_callback)
 		vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-		rate = rospy.Rate(3)
+		rate = rospy.Rate(10)
 		main()
 	except rospy.ROSInterruptException:
 		print("Deteniendo")

@@ -1,0 +1,18 @@
+<launch>
+
+<node pkg="aruco_detect" name="aruco_detect"
+    type="aruco_detect" output="screen" respawn="false">
+    <param name="publish_images" value="true" />
+    <param name="fiducial_len" value="0.33"/>
+    <param name="dictionary" value="4"/>
+    <param name="do_pose_estimation" value="true"/>
+    <!-- <param name="vis_msgs" value="$(arg vis_msgs)"/> -->
+    <param name="ignore_fiducials" value="false"/>
+    <!-- <param name="fiducial_len_override" value="$(arg fiducial_len_override)"/> -->
+    <!-- <param name="verbose" value="$(arg verbose)"/> -->
+    <remap from="/camera/compressed" 
+        to="/camera/image_raw/compressed"/>
+    <remap from="camera_info" to="/camera/camera_info"/>
+  </node>
+
+</launch>

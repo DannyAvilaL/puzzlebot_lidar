@@ -1,7 +1,7 @@
 # Puzzlebot Navigation with LiDAR and Aruco detection
 
 Collaborators:
-- Eva Denisse Vargas Sosa [qdenvars](https://github.com/denvars)
+- Eva Denisse Vargas Sosa [@denvars](https://github.com/denvars)
 - Daniela Avila Luna [@DannyAvilaL](https://github.com/DannyAvilaL)
 - Roberto David Manzo González [@robertomanzo2203](https://github.com/robertomanzo2203)
 

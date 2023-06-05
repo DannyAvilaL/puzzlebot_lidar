@@ -9,12 +9,12 @@ This repository is detined for the puzzlebot robot with a camera and a LiDAR sen
 
 **Launch instructions to launch in separated terminals:**
 
-To launch the challenge world. *This launch includes the odometry estimation with Kalman Filter and publish the frame of the real robot in gazebo*
+To launch the challenge world. *This launch includes the odometry estimation with Kalman Filter, publish the frame of the real robot in gazebo and launch the first aruco detect launch*
 ```
 $ roslaunch bloque navigation_world.launch 
 ```
 
-To launch the aruco deection node.
+To launch the aruco detection node. **This might trigger a warning/error in the previous terminal launch since it launches the node with the same name. It is normal.**
 ```
 $ rosrun aruco_detect aruco_detect /camera/compressed:=/camera/image_raw/compressed /camera_info:=/camera/camera_info
 ```
